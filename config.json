@@ -1,0 +1,53 @@
+{
+  "workflowApiVersion": "1.1",
+  "metaData": {
+    "icon": "images/icon.png",
+    "category": "message"
+  },
+  "type": "REST",
+  "key": "SMS_LleidaNet_CustomActivity",
+  "lang": {
+    "en-US": {
+      "name": "Enviar SMS Lleida.net",
+      "description": "Envía un SMS usando datos de la DE a través de Lleida.net"
+    }
+  },
+  "arguments": {
+    "execute": {
+      "inArguments": [],
+      "url": "https://customactivity-sms-at.onrender.com/execute",
+      "verb": "POST",
+      "body": "",
+      "header": "",
+      "format": "json",
+      "timeout": 10000
+    }
+  },
+  "configurationArguments": {
+    "save": {
+      "url": "https://customactivity-sms-at.onrender.com/save"
+    },
+    "publish": {
+      "url": "https://customactivity-sms-at.onrender.com/publish"
+    },
+    "validate": {
+      "url": "https://customactivity-sms-at.onrender.com/validate"
+    },
+    "stop": {
+      "url": "https://customactivity-sms-at.onrender.com/stop"
+    }
+  },
+  "userInterfaces": {
+    "configModal": {
+      "height": 500,
+      "width": 600,
+      "fullscreen": false,
+      "url": "https://customactivity-sms-at.onrender.com/config.html"
+    }
+  },
+  "edit": {
+    "url": "https://customactivity-sms-at.onrender.com/config.html",
+    "height": 500,
+    "width": 600
+  }
+}

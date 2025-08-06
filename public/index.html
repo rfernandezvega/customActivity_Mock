@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Configuración del envío SMS</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script>
+    <script>
+      (function() {
+        var config = {
+          baseUrl: '',
+          paths: {
+            postmonger: 'https://unpkg.com/postmonger/dist/postmonger.min',
+            customActivity: './customActivity'
+          }
+        };
+        
+        var dependencies = ['customActivity'];
+        
+        require(config, dependencies);
+      })();
+    </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      label {
+        display: block;
+        margin-top: 15px;
+        font-weight: bold;
+      }
+      input, textarea {
+        width: 100%;
+        padding: 8px;
+        margin-top: 5px;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Configuración del envío SMS</h2>
+
+    <label for="phone">Número de teléfono</label>
+    <input type="text" id="phone" placeholder="{{Contact.Default.MobilePhone}}" />
+
+    <label for="message">Mensaje</label>
+    <textarea id="message" rows="4">Hola, este es tu SMS personalizado</textarea>
+
+    <label for="from">Remitente (opcional)</label>
+    <input type="text" id="from" placeholder="Remitente autorizado" />
+  </body>
+</html>
