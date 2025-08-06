@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <title>Enviar SMS Lleida.net</title>
+    <title>Custom Activity Mock</title>
     <script src="https://unpkg.com/postmonger"></script>
     <style>
       body {
@@ -49,10 +49,10 @@
     </style>
   </head>
   <body>
-    <h2>Enviar SMS con Lleida.net</h2>
+    <h2>Custom Activity Mock</h2>
     
     <div class="info-section">
-      <p>Esta actividad envía mensajes SMS a sus contactos utilizando la API de Lleida.net. Los datos se obtienen automáticamente de la Data Extension de entrada.</p>
+      <p>Esta actividad realiza una llamada a un WS de Postman.</p>
     </div>
     
     <div class="field-info">
@@ -61,20 +61,9 @@
       <div class="field-desc"><em>Debe contener números en formato internacional (ej: +34612345678)</em></div>
     </div>
     
-    <div class="field-info">
-      <div class="field-name">Mensaje SMS</div>
-      <div class="field-desc">Se utilizará el campo <strong>SMSMessage</strong> de la Data Extension de entrada.</div>
-      <div class="field-desc"><em>Puede incluir personalizaciones usando la sintaxis de AMPscript</em></div>
-    </div>
-    
-    <div class="field-info">
-      <div class="field-name">Remitente (opcional)</div>
-      <div class="field-desc">Se utilizará el campo <strong>SMSFrom</strong> de la Data Extension de entrada si está disponible.</div>
-      <div class="field-desc"><em>Debe contener un remitente autorizado por Lleida.net</em></div>
-    </div>
     
     <div class="note">
-      <strong>Nota:</strong> Asegúrese de que los campos necesarios existan en la Data Extension de entrada al Journey. Si no existen, el mensaje SMS no podrá ser enviado correctamente.
+      <strong>Nota:</strong> Asegúrese de que los campos necesarios existan en la Data Extension de entrada al Journey.
     </div>
 
     <script>
