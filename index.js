@@ -56,8 +56,8 @@ app.use((req, res, next) => {
 
 //Activa el parseador (Middleware nativo de Express que transforma el cuerpo de la petición a JSON automáticamente) 
 app.use(express.json());
-//Indica a express que sirva todos los archivos estáticos (archivos que no se procesan en el servidor, solo se envían tal como están) de la carpeta raiz
-app.use(express.static(path.join(__dirname, ".")));
+//Indica a express que sirva todos los archivos estáticos (archivos que no se procesan en el servidor, solo se envían tal como están) de la carpeta public
+app.use(express.static(path.join(__dirname, "public")));
 
 
 // Middleware para validacion JWT
