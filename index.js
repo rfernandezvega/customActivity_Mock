@@ -1,9 +1,19 @@
+//Framework para Node.js
 const express = require("express");
-const bodyParser = require("body-parser");
+//Cliente HTTP para realizar llamadas a APIs externas
 const axios = require("axios");
+//Modulo nativo de Node.js para manejar rutas de archivos
 const path = require("path");
+//Importa la libreria para poder validar el token JWT con el secret
+const jwt = require("jsonwebtoken");
 
 const app = express();
+
+/*
+  Process: objeto global incorporado en Node.js
+  Es un objeto que representa el proceso en ejecución de Node.js.
+  Da acceso a información del entorno, argumentos del sistema, eventos, etc
+*/
 const port = process.env.PORT || 3000;
 
 // Funcion para logs de produccion - minimos pero informativos
@@ -16,31 +26,90 @@ function log(message, data = null) {
   }
 }
 
-// Middleware basico
+// Middleware basico que se aplica a todas las peticiones que se reciben 
 app.use((req, res, next) => {
   console.log(`Peticion recibida: ${req.method} ${req.url}`);
   
+  /* Se agregan cabeceras a la respuesta. */ 
+
+  // Permite que la app se pueda mostrar dentro de un iframe en cualquier sitio web. Obligatorio
   res.setHeader("X-Frame-Options", "ALLOWALL");
+  // Permite CORS: habilita que el servidor acepte peticiones desde cualquier dominio.
   res.setHeader("Access-Control-Allow-Origin", "*");
+  // Indica qué métodos HTTP están permitidos (CORS).
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  // Especifica qué headers están permitidos en la solicitud
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   
+  /* 
+    El metodo OPTIONS es para las peticiones CORS preflight request. 
+    Peticiones previas a las reales que realiza el navegador para asegurarse que el servidor permite recibir peticiones desde otro dominio 
+  */
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
+
+  // Llama al siguiente middleware de express (indicado con app.use con los parámetros req, res y next)
+  // Sí no hay una respuesta o next, se quedará colgado.
   next();
 });
 
-app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public")));
+//Activa el parseador (Middleware nativo de Express que transforma el cuerpo de la petición a JSON automáticamente) 
+app.use(express.json());
+//Indica a express que sirva todos los archivos estáticos (archivos que no se procesan en el servidor, solo se envían tal como están) de la carpeta raiz
+app.use(express.static(path.join(__dirname, ".")));
 
-// Middleware simplificado sin validacion JWT
-function verifyJWT(req, res, next) {
-  // Version simplificada sin validacion JWT
-  next();
+
+// Middleware para validacion JWT
+function verifyJWT(req, res, next) 
+{
+  const JWT_SECRET = process.env.JWT_SECRET;
+
+  // El token puede venir en el header Authorization como 'Bearer <token>'
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: "No se proporcionó token de autorización" });
+  }
+
+  // Separar 'Bearer' y el token
+  const token = authHeader.split(" ")[1]; 
+
+  if (!token) {
+    return res.status(401).json({ error: "Token JWT no encontrado" });
+  }
+
+  /* 
+    Validación del token
+    La función intenta verificar que el token:
+      - Está bien formado (estructura JWT correcta).
+      - No ha sido modificado (la firma coincide con el secreto).
+      - No está expirado (si tiene un exp).
+
+  */
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).json({ error: "Token inválido o expirado" });
+    }
+
+    /* 
+      Si el token es válido, la función te entrega un objeto llamado decoded, que contiene los datos del token. Por ejemplo:
+      - sub: Identifica al sujeto del token, normalmente el ID del usuario.
+      - iat: Fecha/hora de emisión en formato timestamp (segundos desde 1970).
+      - exp: Fecha/hora de expiración en formato timestamp.
+
+      Guardar estos datos en req.user (propiedad personalizada) permite que otros middlewares o controladores accedan 
+      a la información del usuario sin tener que verificar el token nuevamente. OPCIONAL
+    */
+    req.user = decoded;
+
+    next();
+  });
 }
 
-// Endpoints requeridos por Marketing Cloud
+
+/* Endpoints requeridos por Marketing Cloud */
+
+//Cuando se arrastra la actividad al Journey, MC busca la ruta /config.json, que es obligatoria. En este caso se devuelve el archivo.
 app.get("/config.json", (req, res) => {
   res.sendFile(path.join(__dirname, "config.json"));
 });
@@ -270,6 +339,8 @@ app.post("/execute", verifyJWT, async (req, res) => {
   }
 });
 
+
+// Se encarga de que el servidor Express empiece a "escuchar" solicitudes HTTP en el puerto definido por port
 app.listen(port, () => {
   log(`Servidor iniciado en puerto ${port} (Sin validacion JWT)`);
 });

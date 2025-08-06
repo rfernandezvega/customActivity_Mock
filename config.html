@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Custom Activity Mock</title>
+    <script src="https://unpkg.com/postmonger"></script>
+   <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        color: #333;
+        margin: 0;
+      }
+      h2 {
+        margin-top: 0;
+        margin-bottom: 25px;
+        color: #333;
+      }
+      .info-section {
+        background-color: #f8f9fa;
+        border-left: 4px solid #5bc0de;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+      }
+      .field-info {
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #eee;
+      }
+      .field-info:last-child {
+        border-bottom: none;
+      }
+      .field-name {
+        font-weight: bold;
+        color: #0066cc;
+        margin-bottom: 5px;
+      }
+      .field-desc {
+        font-size: 14px;
+        margin-top: 5px;
+      }
+      .note {
+        background-color: #fffbd8;
+        border-left: 4px solid #ffd24d;
+        padding: 15px;
+        margin-top: 25px;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .form-field {
+        margin-bottom: 20px;
+      }
+      .form-field label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+        color: #0066cc;
+      }
+      .form-field input[type="text"],
+      .form-field select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box; /* Importante para que el padding no afecte el width */
+      }
+      .field-desc {
+        font-size: 12px;
+        margin-top: 5px;
+        color: #666;
+      }
+      .info-section {
+        background-color: #f8f9fa;
+        border-left: 4px solid #5bc0de;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Configuración de la Actividad</h2>
+    
+    <div class="info-section">
+      <p>Configura los parámetros que se enviarán en la llamada.</p>
+    </div>
+    
+    <div class="form-field">
+      <label for="text-input">Input Text</label>
+      <input type="text" id="text-input" placeholder="Introduzca un valor de texto"/>
+      <div class="field-desc">Este valor se enviará como 'customText' en los argumentos.</div>
+    </div>
+    
+    <div class="form-field">
+      <label for="template-picklist">Seleccionar Plantilla</label>
+      <select id="template-picklist">
+        <option value="Template1">Template 1</option>
+        <option value="Template2">Template 2</option>
+        <option value="Template3">Template 3</option>
+      </select>
+      <div class="field-desc">La plantilla seleccionada se enviará como 'selectedTemplate'.</div>
+    </div>
+    
+    <div class="form-field">
+      <label for="de-field-picklist">DE Field</label>
+      <select id="de-field-picklist">
+          <option value="">-- Campos de la DE... --</option>
+      </select>
+      <div class="field-desc">
+        Seleccione un campo de la Data Extension de entrada. 
+        El valor guardado será la referencia completa (ej: {{Event.APIEvent-XYZ.Id}}).
+      </div>
+    </div>
+    
+    
+    <div class="note">
+      <strong>Nota:</strong> Asegúrese de que los campos necesarios existan en la Data Extension de entrada al Journey.
+    </div>
+
+    <script>
+      // Iniciar comunicación con Journey Builder
+      const connection = new Postmonger.Session();
+
+      // Payload para pasarle a la actividad con la configuración
+      let payload = {};
+      
+      // Almacenará los campos de la DE
+      let schemaFields = [];
+      
+      // Campos que queremos obtener de la DE. Se indican aquí para que, si luego se cambia el nombre, no se tenga que modificar en más sitios.
+      const requiredFields = {
+        phone: 'MobilePhone',
+        message: 'SMSMessage',
+        from: 'SMSFrom'
+      };
+
+      /*
+        Los siguientes bloques son listeners que se ejecutan cuando los llama Journey Builder (on) o los requiere la app (trigger)
+        https://developer.salesforce.com/docs/marketing/marketing-cloud/guide/using-postmonger.html
+      */
+      
+      /* 
+        Cuando se inicia la actividad (se arrastra la actividad al canvas o se hace click) se revisa si data contiene la configuración guardada.
+        Si la tiene se pasa al payload y se monta la estructura que esta definida en el config.json
+      */
+      connection.on("initActivity", function(data) 
+      {
+        if (data) {
+          payload = data;
+          
+          /* Este bloque es una medida de seguridad. Se asegura de que la estructura payload.arguments.execute.inArguments 
+              exista, incluso si la actividad es nueva 
+            Si no se hiciera esto y se tratara de utilizar payload.arguments.execute.inArguments.push() (más adelante), 
+            daría un error porque se está intentando acceder a una propiedad (push) de algo que no existe (undefined).
+            En este caso, no se está guardando nada en el /save, por lo que es necesario definirlo.
+          */
+          if (!payload.arguments) {
+            payload.arguments = {};
+          }
+          if (!payload.arguments.execute) {
+            payload.arguments.execute = {};
+          }
+          if (!payload.arguments.execute.inArguments) {
+            payload.arguments.execute.inArguments = [{}];
+          }
+        }
+        
+        // Solicitar schema de entrada al journey. Es decir, se solicita la lista de todos los campos disponibles en la DE de entrada.
+        connection.trigger('requestSchema');
+        
+        /* Le decimos a Journey Builder que active el botón "Siguiente" / "Hecho". 
+          Si no hicieras esto, el botón estaría deshabilitado y el usuario no podría guardar la configuración.
+        */
+        connection.trigger('updateButton', { button: 'next', enabled: true });
+      });
+
+      /* 
+        Recibir schema y procesar campos. Se ha solicitado al cargar la actividad.
+
+        El objetivo es construir los inArguments, que es la parte más importante del payload. 
+        Los inArguments le indican al endpoint /execute de dónde sacar los valores datos.
+      */
+      connection.on('requestedSchema', function (data) {
+        try {
+          // Verificar si tenemos schema
+          if (!data || !data.schema) {
+            console.warn("No se recibió esquema de la DE.");
+            return;
+          }
+          
+          const schema = data.schema;
+          
+          // Extraer el eventDefinitionKey (UUID del evento)
+          // Formato ejemplo de la Key: Event.APIEvent-1a11c19c-7952-488a-99d7-069fa2bc543c.Id
+          let eventDefinitionKey = "";
+          
+          if (Array.isArray(schema) && schema.length > 0) {
+            // Tomar la primera key y extraer la parte del medio
+            const firstKey = schema[0].key;
+            
+            const parts = firstKey.split('.');
+            if (parts.length >= 2) {
+              eventDefinitionKey = parts[1]; // Extraer el APIEvent-UUID
+            }
+          }
+          
+          // Limpiar inArguments existentes
+          payload.arguments.execute.inArguments = [];
+          
+          // Crear objeto con argumentos
+          const inArgs = {};     
+          
+          /* 
+            Si encontramos el eventDefinitionKey, crear bindings completos 
+            Esto se podría indicar directamente en el config.json, pero en este caso los nombres
+            de los campos de la DE siempre deberían ser los indicados en el archivo de configuración.
+          */
+          if (eventDefinitionKey) {
+            inArgs.phone = `{{Event.${eventDefinitionKey}.${requiredFields.phone}}}`;
+            inArgs.message = `{{Event.${eventDefinitionKey}.${requiredFields.message}}}`;
+            inArgs.from = `{{Event.${eventDefinitionKey}.${requiredFields.from}}}`;
+          } else {
+            // Si no encontramos el eventDefinitionKey, se puede intentar recuperar de ContactData
+            inArgs.phone = `{{Contact.Attribute.DataExtension.${requiredFields.phone}}}`;
+            inArgs.message = `{{Contact.Attribute.DataExtension.${requiredFields.message}}}`;
+            inArgs.from = `{{Contact.Attribute.DataExtension.${requiredFields.from}}}`;
+          }
+          
+          // Agregar a inArguments
+          payload.arguments.execute.inArguments.push(inArgs);
+        } catch (error) {
+          console.error("Error al procesar schema:", error);
+        }
+      });
+
+      // Cuando se hace clic en Done/Next
+      connection.on("clickedNext", function() {
+        try {
+          // Marcar como configurado
+          if (!payload.metaData) {
+            payload.metaData = {};
+          }
+
+          // Necesario para indicarle a JB que esta configurado. Si no no dejará activar.
+          payload.metaData.isConfigured = true;
+          
+          // Se le indica a Journey Builder que debe cerrar la ventana y que la configuración está lista
+          connection.trigger("updateActivity", payload);
+        } catch (error) {
+          console.error("Error al guardar:", error);
+        }
+      });
+
+      // Notificar que estamos listos. La primera vez que se usar el ready, JB llama a initActivity o initEvent.
+      connection.trigger("ready");
+    </script>
+  </body>
+</html>
