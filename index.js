@@ -281,6 +281,13 @@ async function getSfmcAccessToken() {
   
   sfmcTokenPromise = new Promise(async (resolve, reject) => {
     try {
+
+      // Recuperacion de las variables de entorno
+      const AUTH_URI = process.env.AUTH_URI;
+      const CLIENT_ID = process.env.CLIENT_ID;
+      const CLIENT_SECRET = process.env.CLIENT_SECRET;
+      const MID = process.env.MID;
+
       // Validar que las variables de entorno necesarias existen.
       const { AUTH_URI, CLIENT_ID, CLIENT_SECRET, MID } = process.env;
       if (!AUTH_URI || !CLIENT_ID || !CLIENT_SECRET || !MID) {
