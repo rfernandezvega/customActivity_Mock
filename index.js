@@ -157,7 +157,7 @@ app.get("/api/templates", async (req, res) => {
   try {
     const accessToken = await getSfmcAccessToken();
     const restUri = process.env.REST_URI;
-    const deCustomerKey = "Templates"; // La clave externa de tu Data Extension
+    const deCustomerKey = "Templates_CK"; // La clave externa de tu Data Extension
 
     if (!restUri) {
       throw new Error("La variable de entorno REST_URI no está configurada.");
