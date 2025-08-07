@@ -1,0 +1,150 @@
+/*
+  Hoja de estilos para la interfaz de la Custom Activity.
+  Inspirada en el Salesforce Lightning Design System (SLDS) para una apariencia nativa.
+*/
+
+:root {
+  /* Variables de color para mantener un diseño consistente */
+  --brand-primary: #0070d2;
+  --background-color: #f3f3f3;
+  --card-background: #ffffff;
+  --text-color: #181818;
+  --label-color: #3e3e3e;
+  --border-color: #dddbda;
+  --border-radius: 0.25rem;
+  --input-background: #ffffff;
+  --info-background: #f3f9fe;
+  --info-border: #0070d2;
+  --note-background: #fff9e3;
+  --note-border: #ffb75d;
+}
+
+body {
+  /* Usar la pila de fuentes del sistema para una apariencia moderna y nativa */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--background-color);
+  padding: 20px;
+  color: var(--text-color);
+  margin: 0;
+}
+
+/* Contenedor para el mensaje de carga o error que se muestra al inicio */
+#loader-container {
+  text-align: center;
+  padding-top: 50px;
+  font-size: 16px;
+  color: #666;
+}
+/* Estilo específico para cuando el loader muestra un mensaje de error */
+#loader-container.error {
+  font-weight: bold;
+  color: #c23934;
+}
+
+/* El contenedor principal del formulario, oculto por defecto hasta que todo esté listo */
+#form-container {
+  display: none;
+}
+
+/* Estilo para la cabecera del formulario */
+.header {
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+.header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Estilo para las "tarjetas" o secciones que agrupan los campos */
+.form-section {
+  background-color: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+/* Título dentro de cada sección */
+.section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--brand-primary);
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+/* Contenedor para cada campo del formulario (label, input, description) */
+.form-field {
+  margin-bottom: 20px;
+}
+.form-field:last-child {
+  margin-bottom: 0;
+}
+
+/* Estilo de las etiquetas (labels) de los campos */
+.form-field label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--label-color);
+}
+
+/* Estilo base para inputs de texto y desplegables */
+.form-field input[type="text"],
+.form-field select {
+  width: 100%;
+  padding: 10px;
+  font-size: 0.875rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background-color: var(--input-background);
+  box-sizing: border-box;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* Efecto de foco para resaltar el campo activo */
+.form-field input[type="text"]:focus,
+.form-field select:focus {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 1px var(--brand-primary);
+  outline: 0;
+}
+
+/* Flecha personalizada para los desplegables (select) para un look consistente en todos los navegadores */
+.form-field select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+  background-repeat: no-repeat;
+  background-position: right 0.7em top 50%, 0 0;
+  background-size: 0.65em auto;
+}
+
+/* Descripción de ayuda debajo de cada campo */
+.field-desc {
+  font-size: 0.8rem;
+  margin-top: 8px;
+  color: #545454;
+}
+
+/* Estilo para las cajas de información y notas */
+.info-box {
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: var(--border-radius);
+  font-size: 0.875rem;
+  border-left: 4px solid;
+}
+.info-box.info {
+  background-color: var(--info-background);
+  border-color: var(--info-border);
+}
+.info-box.note {
+  background-color: var(--note-background);
+  border-color: var(--note-border);
+}
