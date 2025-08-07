@@ -63,19 +63,17 @@ app.use(express.static(path.join(__dirname, "public")));
 // Middleware para validacion JWT
 function verifyJWT(req, res, next) 
 {
-  const JWT_SECRET = process.env.JWT_SECRET;
-
-  // El token puede venir en el header Authorization como 'Bearer <token>'
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ error: "No se proporcionó token de autorización" });
+  // En Custom Activities, MC envía el JWT en el body, no en el header.
+  if (!req.body || !req.body.token) {
+      log("Error de autenticación: No se encontró token JWT en el cuerpo de la petición.");
+      return res.status(401).json({ error: "Token JWT no encontrado en el body" });
   }
+  const token = req.body.token;
 
-  // Separar 'Bearer' y el token
-  const token = authHeader.split(" ")[1]; 
-
-  if (!token) {
-    return res.status(401).json({ error: "Token JWT no encontrado" });
+  const JWT_SECRET = process.env.JWT_SECRET;
+  if (!JWT_SECRET) {
+      log("Error de configuración del servidor: JWT_SECRET no definido.");
+      return res.status(500).json({ error: "Secreto de JWT no configurado en el servidor." });
   }
 
   /* 
@@ -84,10 +82,19 @@ function verifyJWT(req, res, next)
       - Está bien formado (estructura JWT correcta).
       - No ha sido modificado (la firma coincide con el secreto).
       - No está expirado (si tiene un exp).
-
+    La "Audience" es un claim (una pieza de información) dentro del token que especifica para quién o para qué servicio está destinado ese token.
+    ¿Quién lo establece? 
+      Cuando se configura "useJwt": true en config.json, Marketing Cloud no solo firma el token, sino que también lo emiten con una audiencia específica. 
+      Para las Custom Activities, esa audiencia es 'custom-activity'.
+    ¿Cómo funciona la verificación? 
+      Al añadir el objeto de opciones { audience: 'custom-activity' } a jwt.verify(), le estás diciendo a la librería jsonwebtoken:
+      "No solo verifiques que la firma y la fecha de expiración sean correctas. 
+      También es OBLIGATORIO que compruebes que el token tiene un claim de audiencia (aud) y que su valor sea exactamente 'custom-activity'. 
+      Si no es así, considera que la verificación ha fallado."
   */
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, JWT_SECRET, { audience: 'custom-activity' }, (err, decoded) => {
     if (err) {
+      log("Error de autenticación: Token inválido o expirado.", { error: err.message });
       return res.status(401).json({ error: "Token inválido o expirado" });
     }
 
@@ -210,132 +217,120 @@ function getInArgValue(inArgs, fieldName) {
   return arg[fieldName];
 }
 
-// Endpoint principal para ejecutar la actividad
+// Endpoint principal para ejecutar la actividad. Se puede eliminar verifyJWT para pruebas.
 app.post("/execute", verifyJWT, async (req, res) => {
-  log("Procesando peticion");
+  log("Procesando petición push");
   
   try {
     // Obtener inArguments
     const inArgs = req.body.inArguments || 
                   (req.body.arguments?.execute?.inArguments) || 
                   [];
-    
-    // Obtener los data bindings configurados
-    const phoneBinding = getInArgValue(inArgs, 'phone');
-    const messageBinding = getInArgValue(inArgs, 'message');
-    const fromBinding = getInArgValue(inArgs, 'from');
+                      
+    // Obtener valores y bindings de la configuración
+    const customText = getInArgValue(inArgs, 'customText'); // Valor estático
+    const selectedTemplate = getInArgValue(inArgs, 'selectedTemplate'); // Valor estático
+    const deFieldBinding = getInArgValue(inArgs, 'selectedDEField'); // Data Binding
+    const phoneBinding = getInArgValue(inArgs, 'phone'); // Data Binding
+    const messageBinding = getInArgValue(inArgs, 'message'); // Data Binding
     
     // Extraer valores de los data bindings
-    let phone = extractDataBindingValue(phoneBinding, req.body);
-    let message = extractDataBindingValue(messageBinding, req.body);
-    let from = extractDataBindingValue(fromBinding, req.body) || "";
-    
-    // Verificar datos obligatorios
-    if (!phone) {
-      log("Error: No se pudo obtener el numero de telefono");
-      return res.status(400).json({ 
-        error: "No se pudo obtener el numero de telefono de la Data Extension.",
-        details: "El campo de telefono no existe o esta vacio en los datos del Journey."
-      });
-    }
-    
-    if (!message) {
-      log("Error: No se pudo obtener el mensaje");
-      return res.status(400).json({ 
-        error: "No se pudo obtener el mensaje de la Data Extension.",
-        details: "El campo de mensaje no existe o esta vacio en los datos del Journey."
-      });
-    }
-    
-    // Credenciales de Lleida.net
-    const user = process.env.USER_LLEIDA;
-    const apiKey = process.env.PASS_LLEIDA;
+    const deFieldValue = extractDataBindingValue(deFieldBinding, req.body);
+    const phone = extractDataBindingValue(phoneBinding, req.body);
+    const message = extractDataBindingValue(messageBinding, req.body);
 
-    if (!user) {
-      log("Error: USER_LLEIDA no definido");
-      return res.status(500).json({ error: "Credencial USER_LLEIDA no configurada" });
+    log("Valores recuperados de la actividad:", {
+          contactKey: req.body.keyValue,
+          staticValues: { customText, selectedTemplate },
+          resolvedValues: { deFieldValue, phone, message }
+        });
+
+    // -- Paso 1: Obtener el token de autenticación del servicio mock --
+    let accessToken;
+    try {
+      log("Solicitando token de acceso al servicio mock...");
+      const tokenResponse = await axios.post('https://b9b67f2c-daf7-47aa-b8d7-8f42e290511a.mock.pstmn.io/token', {});
+      
+      if (!tokenResponse.data || !tokenResponse.data.access_token) {
+        throw new Error("La respuesta del servicio de token es inválida o no contiene un 'access_token'.");
+      }
+
+      accessToken = tokenResponse.data.access_token;
+     
+      log("Token de acceso obtenido con éxito.");
+
+    } catch (tokenError) {
+      log("Error al obtener el token de acceso", { 
+        error: tokenError.message, 
+        status: tokenError.response?.status,
+        data: tokenError.response?.data
+      });
+      // Devolver error a Marketing Cloud
+      return res.status(500).json({ 
+        status: "error", 
+        message: "Fallo al obtener el token de autenticación del servicio externo."
+      });
     }
+
+    // -- Paso 2: Enviar los datos al servicio de push con el token --
     
-    if (!apiKey) {
-      log("Error: PASS_LLEIDA no definido");
-      return res.status(500).json({ error: "Credencial PASS_LLEIDA no configurada" });
-    }
-    
-    // Verificar numero de telefono (formato internacional)
-    if (!phone.startsWith('+')) {
-      log("Error: Numero de telefono sin formato internacional", { phone });
-      return res.status(400).json({ error: "El numero de telefono debe tener formato internacional (comenzar con +)" });
-    }
-    
-    // Enviar SMS a Lleida.net
-    const apiUrl = "https://api.lleida.net/sms/v2/";
-    
-    // Preparar el cuerpo de la peticion
-    const requestBody = {
-      sms: {
-        user: user,
-        dst: { num: phone },
-        txt: message
+    // Preparar el cuerpo de la petición para el servicio de push
+    const pushPayload = {
+      contactKey: req.body.keyValue, // El ContactKey del Journey
+      dataFromActivity: {
+        customText,
+        selectedTemplate,
+        deFieldValue,
+        phone,
+        message
       }
     };
     
-    // Agregar remitente si se especifico
-    if (from && from.trim() !== '') {
-      requestBody.sms.src = from;
-    }
+    log("Enviando datos al servicio push", { payload: pushPayload });
     
-    try {
-      // Envio a Lleida.net con autenticacion mediante API Key en el header
-      const response = await axios.post(apiUrl, requestBody, {
+    // Enviar datos al servicio mock de push
+    const pushResponse = await axios.post(
+      'https://b9b67f2c-daf7-47aa-b8d7-8f42e290511a.mock.pstmn.io/push',
+      pushPayload,
+      {
         headers: { 
-          "Content-Type": "application/json; charset=utf-8",
-          "Accept": "application/json",
-          "Authorization": `x-api-key ${apiKey}`
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
         }
-      });
+      }
+    );
 
-      log("SMS enviado con exito", { 
-        phone: phone,
-        messageLength: message.length, 
-        status: response.status
+    if (pushResponse.status >= 200 && pushResponse.status < 300) {
+      log("Llamada al servicio push realizada con éxito", { 
+        status: pushResponse.status,
+        response: pushResponse.data 
       });
       
-      // Devolver respuesta a Marketing Cloud
-      res.status(200).json({ 
+      // Devolver respuesta OK a Marketing Cloud
+      return res.status(200).json({ 
         status: "ok", 
-        result: response.data,
-        details: {
-          to: phone,
-          message: message,
-          from: from || "default",
-          timestamp: new Date().toISOString()
-        }
+        result: pushResponse.data
       });
-    } catch (error) {
-      log("Error al enviar SMS", { 
-        error: error.message, 
-        status: error.response?.status 
+    } else {
+      // Este bloque es por si axios se configurara para no lanzar error en códigos 4xx/5xx
+      throw new Error(`El servicio push respondió con un estado inesperado: ${pushResponse.status}`);
+    }
+  } catch (pushError) {
+    log("Error al enviar la petición al servicio push", { 
+        error: pushError.message, 
+        status: pushError.response?.status,
+        data: pushError.response?.data
       });
       
       // Devolver error a Marketing Cloud
-      res.status(error.response?.status || 500).json({ 
+      return res.status(500).json({ 
         status: "error", 
+        message: "Fallo al enviar los datos al servicio de push.",
         details: {
-          message: error.message,
-          status: error.response?.status,
-          data: error.response?.data
+          errorMessage: pushError.message,
+          statusCode: pushError.response?.status
         }
       });
-    }
-  } catch (error) {
-    log("Error general en procesamiento", { error: error.message });
-    res.status(500).json({ 
-      status: "error", 
-      message: "Error interno al procesar la solicitud",
-      details: {
-        error: error.message
-      }
-    });
   }
 });
 
