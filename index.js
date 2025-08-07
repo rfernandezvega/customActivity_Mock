@@ -137,15 +137,16 @@ app.post("/save", (req, res) => {
   res.status(200).json({ success: true });
 });
 
-app.post("/validate", (req, res) => {
+app.post("/validate", verifyJWT, (req, res) => {
   log("Recibida petición de validación en /validate");
-  log("Cuerpo de la validación:", req.body);
 
-  // El cuerpo de la petición contiene la configuración completa de la actividad.
-  // Los argumentos que nos interesan están en req.body.inArguments.
-  const inArguments = req.body.inArguments || [];
+  // Gracias a verifyJWT, el contenido de la petición está en req.activityPayload.
+  const activityPayload = req.activityPayload;
+  log("Payload decodificado para validación:", activityPayload);
 
-  // Verificamos que los argumentos existan y no estén vacíos.
+  // Los argumentos que nos interesan están en activityPayload.inArguments.
+  const inArguments = activityPayload.inArguments || [];
+
   if (inArguments.length === 0) {
     log("Validación fallida: inArguments está vacío.");
     return res.status(400).json({ error: "La actividad no ha sido configurada." });
@@ -153,20 +154,16 @@ app.post("/validate", (req, res) => {
 
   const args = inArguments[0];
 
-  // Definimos las reglas de validación.
-  // Comprobamos que los campos clave que se configuran en la UI existan.
-  // Es importante comprobar los campos que el usuario DEBE rellenar.
-  const isCustomTextValid = args.hasOwnProperty('customText'); // Puede ser una cadena vacía, así que solo comprobamos que exista.
+  // Las reglas de validación ahora se aplican sobre el contenido decodificado.
+  const isCustomTextValid = args.hasOwnProperty('customText');
   const isTemplateValid = !!args.selectedTemplate;
-  const isDEFieldValid = !!args.selectedDEField; // Este es crucial, ya que el usuario lo selecciona.
-  const isPhoneBindingValid = !!args.phone; // El binding de teléfono también debería estar siempre.
+  const isDEFieldValid = !!args.selectedDEField;
+  const isPhoneBindingValid = !!args.phone;
 
   if (isCustomTextValid && isTemplateValid && isDEFieldValid && isPhoneBindingValid) {
-    // Si todas las comprobaciones pasan, la configuración es válida.
     log("Validación exitosa: La configuración de la actividad es completa.");
     res.status(200).json({ success: true });
   } else {
-    // Si alguna comprobación falla, devolvemos un error.
     log("Validación fallida: Faltan uno o más campos de configuración.", { args });
     return res.status(400).json({ error: "Configuración incompleta. Asegúrese de que todos los campos estén configurados." });
   }
