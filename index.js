@@ -212,7 +212,7 @@ function getInArgValue(inArgs, fieldName) {
 
 // Endpoint principal para ejecutar la actividad
 app.post("/execute", verifyJWT, async (req, res) => {
-  log("Procesando peticion SMS");
+  log("Procesando peticion");
   
   try {
     // Obtener inArguments

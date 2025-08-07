@@ -17,8 +17,6 @@
       "inArguments": [],
       "url": "https://customactivity-mock.onrender.com/execute",
       "verb": "POST",
-      "body": "",
-      "header": "",
       "format": "json",
       "timeout": 10000
     }
