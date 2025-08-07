@@ -63,6 +63,11 @@ app.use(express.static(path.join(__dirname, "public")));
 // Middleware para validacion JWT
 function verifyJWT(req, res, next) 
 {
+  log("--- INICIANDO VERIFICACIÓN JWT ---");
+  log("Cabeceras de la petición:", req.headers);
+  log("Cuerpo completo de la petición:", req.body);
+  log("--- FIN DE DATOS DE DEPURACIÓN ---");
+  
   // En Custom Activities, MC envía el JWT en el body, no en el header.
   if (!req.body || !req.body.token) {
       log("Error de autenticación: No se encontró token JWT en el cuerpo de la petición.");
@@ -217,7 +222,7 @@ function getInArgValue(inArgs, fieldName) {
   return arg[fieldName];
 }
 
-// Endpoint principal para ejecutar la actividad. Se puede eliminar verifyJWT para pruebas.
+// Endpoint principal para ejecutar la actividad. Se puede eliminar verifyJWT para pruebas. app.post("/execute", verifyJWT, async (req, res)
 app.post("/execute", verifyJWT, async (req, res) => {
   log("Procesando petición push");
   
