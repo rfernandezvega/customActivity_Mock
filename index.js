@@ -458,12 +458,11 @@ app.post("/execute", verifyJWT, async (req, res) => {
     const message = extractDataBindingValue(messageBinding, activityPayload);
 
     // Mensaje personalizado.
-
     let messageToSend = personalizeText(templateMessage, activityPayload) || templateMessage;
 
     log("Valores recuperados de la actividad:", {
           staticValues: { customText, selectedTemplate },
-          resolvedValues: { deFieldValue, phone, message }
+          resolvedValues: { deFieldValue, phone, message, messageToSend }
         });
 
     // -- Paso 1: Obtener el token de autenticación del servicio mock --
