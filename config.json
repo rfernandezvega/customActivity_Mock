@@ -18,21 +18,26 @@
       "url": "https://customactivity-mock.onrender.com/execute",
       "verb": "POST",
       "format": "json",
+      "useJwt": true,
       "timeout": 10000
     }
   },
   "configurationArguments": {
     "save": {
-      "url": "https://customactivity-mock.onrender.com/save"
+      "url": "https://customactivity-mock.onrender.com/save",
+      "useJwt": true
     },
     "publish": {
-      "url": "https://customactivity-mock.onrender.com/publish"
+      "url": "https://customactivity-mock.onrender.com/publish",
+      "useJwt": true
     },
     "validate": {
-      "url": "https://customactivity-mock.onrender.com/validate"
+      "url": "https://customactivity-mock.onrender.com/validate",
+      "useJwt": true
     },
     "stop": {
-      "url": "https://customactivity-mock.onrender.com/stop"
+      "url": "https://customactivity-mock.onrender.com/stop",
+      "useJwt": true
     }
   },
   "userInterfaces": {
