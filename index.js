@@ -130,10 +130,12 @@ function verifyJWT(req, res, next)
 
 //Cuando se arrastra la actividad al Journey, MC busca la ruta /config.json, que es obligatoria. En este caso se devuelve el archivo.
 app.get("/config.json", (req, res) => {
+  log("Recibida petición de solicitud de config.json");
   res.sendFile(path.join(__dirname, "config.json"));
 });
 
 app.post("/save", (req, res) => {
+  log("Recibida petición de validación en /save");
   res.status(200).json({ success: true });
 });
 
@@ -146,10 +148,12 @@ app.post("/validate", verifyJWT, (req, res) => {
 });
 
 app.post("/publish", (req, res) => {
+  log("Recibida petición de validación en /publish");
   res.status(200).json({ success: true });
 });
 
 app.post("/stop", (req, res) => {
+  log("Recibida petición de validación en /stop");
   res.status(200).json({ success: true });
 });
 
