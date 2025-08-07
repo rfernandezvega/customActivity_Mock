@@ -23,6 +23,8 @@ const port = process.env.PORT || 3000;
 let cachedToken = null;
 // Almacenará el timestamp de expiración en milisegundos
 let tokenExpiresAt = null;
+// Variable para manejar la promesa pendiente de obtener un token.
+let tokenPromise = null; 
 
 // Funcion para logs de produccion - minimos pero informativos
 function log(message, data = null) {
@@ -164,6 +166,56 @@ app.post("/stop", (req, res) => {
   res.status(200).json({ success: true });
 });
 
+async function getAccessToken() {
+  // Caso 1: Tenemos un token válido en caché. Devolverlo inmediatamente.
+  if (cachedToken && Date.now() < (tokenExpiresAt - 60000)) {
+    log("Usando token válido desde la caché.");
+    return cachedToken;
+  }
+
+  // Caso 2: Otra petición ya está buscando un token. Esperar a que esa promesa se resuelva.
+  if (tokenPromise) {
+    log("Esperando a que otra petición complete la obtención del token...");
+    return tokenPromise;
+  }
+
+  // Caso 3: Somos la primera petición que necesita un token nuevo.
+  log("Token no encontrado o expirado. Solicitando uno nuevo...");
+  
+  // Creamos la promesa y la guardamos. Las siguientes peticiones entrarán en el 'Caso 2'.
+  tokenPromise = new Promise(async (resolve, reject) => {
+    try {
+      const tokenResponse = await axios.post('https://b9b67f2c-daf7-47aa-b8d7-8f42e290511a.mock.pstmn.io/token', {});
+      
+      if (!tokenResponse.data || !tokenResponse.data.access_token || !tokenResponse.data.expires_in) {
+        throw new Error("Respuesta inválida del servicio de token.");
+      }
+
+      const accessToken = tokenResponse.data.access_token;
+      const expiresInSeconds = tokenResponse.data.expires_in;
+      
+      // Actualizar la caché
+      cachedToken = accessToken;
+      tokenExpiresAt = Date.now() + (expiresInSeconds * 1000);
+
+      log("Nuevo token obtenido y guardado en caché.", { expiresAt: new Date(tokenExpiresAt).toISOString() });
+      
+      // La promesa se resuelve con el nuevo token
+      resolve(accessToken);
+
+    } catch (error) {
+      log("Error al obtener un nuevo token de acceso.", { error: error.message });
+      // La promesa se rechaza con el error
+      reject(error);
+    } finally {
+      // Importante: Limpiar la promesa pendiente para que la siguiente vez que expire el token, se pueda pedir uno nuevo.
+      tokenPromise = null;
+    }
+  });
+
+  return tokenPromise;
+}
+
 // Funcion para extraer el valor de un data binding
 function extractDataBindingValue(binding, data) {
   if (!binding || typeof binding !== 'string' || binding.trim() === '') {
@@ -246,7 +298,7 @@ function getInArgValue(inArgs, fieldName) {
 
 // Endpoint principal para ejecutar la actividad. Se puede eliminar verifyJWT para pruebas. app.post("/execute", verifyJWT, async (req, res)
 app.post("/execute", verifyJWT, async (req, res) => {
-  log("Procesando petición push");
+  log("Procesando petición execute");
   
   try {
     // Obtener inArguments
@@ -266,50 +318,20 @@ app.post("/execute", verifyJWT, async (req, res) => {
     const message = extractDataBindingValue(messageBinding, activityPayload);
 
     log("Valores recuperados de la actividad:", {
-          contactKey: req.body.keyValue,
           staticValues: { customText, selectedTemplate },
           resolvedValues: { deFieldValue, phone, message }
         });
 
     // -- Paso 1: Obtener el token de autenticación del servicio mock --
     let accessToken;
-    // Comprobar si tenemos un token en caché Y si no ha expirado
-    // Se añade un buffer de seguridad de 60 segundos.
-    if (cachedToken && Date.now() < (tokenExpiresAt - 60000)) {
-      log("Usando token válido desde la caché.");
-      accessToken = cachedToken;
-    } else {
-      // Si no hay token o ha expirado (o está a punto de), pedimos uno nuevo
-      log("Token no encontrado en caché o expirado. Solicitando uno nuevo...");
-
-      try {
-        log("Solicitando token de acceso al servicio mock...");
-        const tokenResponse = await axios.post('https://b9b67f2c-daf7-47aa-b8d7-8f42e290511a.mock.pstmn.io/token', {});
-        
-        if (!tokenResponse.data || !tokenResponse.data.access_token || !tokenResponse.data.expires_in) {
-          throw new Error("La respuesta del servicio de token es inválida o no contiene un 'access_token' y 'expires_in'.");
-        }
-
-         // Guardar el nuevo token y calcular su fecha de expiración
-        accessToken = tokenResponse.data.access_token;
-        const expiresInSeconds = tokenResponse.data.expires_in;
-        
-        cachedToken = accessToken;
-        tokenExpiresAt = Date.now() + (expiresInSeconds * 1000); // Convertir segundos a milisegundos
-      
-        log("Nuevo token obtenido y guardado en caché.", { expiresAt: new Date(tokenExpiresAt).toISOString() });
-      } catch (tokenError) {
-        log("Error al obtener el token de acceso", { 
-          error: tokenError.message, 
-          status: tokenError.response?.status,
-          data: tokenError.response?.data
-        });
-        // Devolver error a Marketing Cloud
-        return res.status(500).json({ 
-          status: "error", 
-          message: "Fallo al obtener el token de autenticación del servicio externo."
-        });
-      }
+    try {
+      accessToken = await getAccessToken();
+    } catch (tokenError) {
+      // Si la obtención del token falla, devolver error.
+      return res.status(500).json({ 
+        status: "error", 
+        message: "Fallo al obtener el token de autenticación del servicio externo."
+      });
     }
 
     // -- Paso 2: Enviar los datos al servicio de push con el token --
