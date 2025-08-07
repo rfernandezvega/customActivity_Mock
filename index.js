@@ -22,7 +22,7 @@ const port = process.env.PORT || 3000;
 */
 let cachedToken = null;
 // Almacenará el timestamp de expiración en milisegundos
-let tokenExpiresAt = null; .
+let tokenExpiresAt = null;
 
 // Funcion para logs de produccion - minimos pero informativos
 function log(message, data = null) {
