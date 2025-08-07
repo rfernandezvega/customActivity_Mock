@@ -1,17 +1,19 @@
+/**
+ * @file activityRoutes.js
+ * @description Define todas las rutas (endpoints) de la API para la Custom Activity.
+ * Este archivo actúa como el controlador principal, recibiendo las peticiones HTTP
+ * y orquestando las llamadas a los servicios y funciones de utilidad correspondientes.
+ */
+
 // Trae el framework Express. Lo necesitamos para poder usar su funcionalidad de Router.
 const express = require("express");
-
-// Trae el módulo 'path' de Node.js para manejar rutas de archivos de forma segura.
-const path = require("path");
 
 // Importa nuestro propio middleware de seguridad desde su archivo.
 // El '../' significa "sube un nivel de carpeta" (de /routes a /src).
 const verifyJWT = require('../middlewares/verifyJWT');
 
-// Importa DE FORMA SELECTIVA (usando { ... }) solo la función que necesitamos del servicio de SFMC.
+// Importa DE FORMA SELECTIVA (usando { ... }) solo las funciones que necesitamos de nuestros archivos de servicios.
 const { getTemplatesFromDE } = require('../services/sfmcService');
-
-// Importa solo la función para enviar el push desde el servicio del mock.
 const { sendPush } = require('../services/mockService');
 
 // Importa nuestro "set de herramientas" para manejar los datos del Journey.
@@ -24,54 +26,98 @@ const {
 // Importa nuestra función de log estandarizada.
 const log = require('../utils/logger');
 
+/**
+ * @constant router
+ * @description Una instancia de express.Router().
+ * El Router de Express nos permite agrupar un conjunto de rutas relacionadas en un
+ * módulo separado. Esto mantiene nuestro archivo principal (index.js) limpio y se
+ * enfoca solo en la configuración del servidor, mientras que este archivo se enfoca
+ * en la lógica de las rutas de la actividad.
+ * Funciona como una "mini-aplicación" que luego se "monta" en la aplicación principal.
+ */
 const router = express.Router();
 
 // --- Rutas del Ciclo de Vida y UI ---
 
-
-// Endpoint para que el frontend obtenga los templates
+/**
+ * @route GET /api/templates
+ * @description Endpoint para la interfaz de usuario (config.html).
+ * Se encarga de llamar al servicio de SFMC para obtener la lista de templates
+ * desde la Data Extension y devolverla en formato JSON para poblar el desplegable.
+ */
 router.get("/api/templates", async (req, res) => {
   try {
     const templates = await getTemplatesFromDE();
     res.status(200).json(templates);
   } catch (error) {
+    // Si la obtención de templates falla, se devuelve un error 500.
     res.status(500).json({ error: "No se pudieron obtener los templates." });
   }
 });
 
+/**
+ * @route POST /save
+ * @description Endpoint del ciclo de vida de Journey Builder.
+ * Se llama cuando el usuario hace clic en "Hecho" en la UI.
+ * En esta implementación, simplemente confirma la recepción.
+ */
 router.post("/save", (req, res) => {
-  log("Recibida petición de validación en /save");
+  log("Recibida petición en /save");
   res.status(200).json({ success: true });
 });
 
+/**
+ * @route POST /validate
+ * @description Endpoint del ciclo de vida de Journey Builder.
+ * Se llama cuando el usuario intenta validar o activar el Journey.
+ * Está protegido por JWT. Si la petición llega hasta aquí, significa que es auténtica.
+ * Sirve como un "ping" de validación para Journey Builder.
+ */
 router.post("/validate", verifyJWT, (req, res) => {
   log("Recibida petición de validación en /validate");
   log("Payload decodificado para validación:", req.activityPayload);
   res.status(200).json({ success: true });
 });
 
+/**
+ * @route POST /publish
+ * @description Endpoint del ciclo de vida de Journey Builder.
+ * Se llama cuando el Journey se activa.
+ */
 router.post("/publish", (req, res) => {
-  log("Recibida petición de validación en /publish");
+  log("Recibida petición en /publish");
   res.status(200).json({ success: true });
 });
 
+/**
+ * @route POST /stop
+ * @description Endpoint del ciclo de vida de Journey Builder.
+ * Se llama cuando el Journey se detiene.
+ */
 router.post("/stop", (req, res) => {
-  log("Recibida petición de validación en /stop");
+  log("Recibida petición en /stop");
   res.status(200).json({ success: true });
 });
+
 
 // --- Endpoint Principal de Ejecución ---
 
-// Endpoint principal para ejecutar la actividad.
+/**
+ * @route POST /execute
+ * @description El endpoint principal de la actividad.
+ * Journey Builder llama a esta ruta para cada contacto que llega a la actividad en el Journey.
+ * Está protegido por JWT. La lógica principal de la actividad reside aquí.
+ */
 router.post("/execute", verifyJWT, async (req, res) => {
   log("Procesando petición execute");
   
   try {
-    // Obtener inArguments
+    // El middleware verifyJWT ya ha decodificado el token y ha puesto su contenido en req.activityPayload.
     const activityPayload = req.activityPayload;
+    // Extraer los argumentos de configuración guardados desde el payload del token.
     const inArgs = activityPayload.inArguments || [];
                       
-    // Obtener valores y bindings de la configuración
+    // Obtener los valores de configuración guardados usando nuestra función de utilidad.
     const customText = getInArgValue(inArgs, 'customText'); // Valor estático
     const selectedTemplate = getInArgValue(inArgs, 'selectedTemplate'); // Valor estático
     const templateMessage = getInArgValue(inArgs, 'selectedTemplateMessage'); // El mensaje SIN personalizar
@@ -79,20 +125,21 @@ router.post("/execute", verifyJWT, async (req, res) => {
     const phoneBinding = getInArgValue(inArgs, 'phone'); // Data Binding
     const messageBinding = getInArgValue(inArgs, 'message'); // Data Binding
     
-    // Extraer valores de los data bindings
+    // Resolver los data bindings para obtener los valores específicos de este contacto.
     const deFieldValue = extractDataBindingValue(deFieldBinding, activityPayload);
     const phone = extractDataBindingValue(phoneBinding, activityPayload);
     const message = extractDataBindingValue(messageBinding, activityPayload);
 
-    // Mensaje personalizado.
-    let messageToSend = personalizeText(templateMessage, activityPayload) || message; // Fallback al campo 'message'
+    // Personalizar el mensaje de la plantilla con los datos del contacto.
+    // Si no hay mensaje de plantilla, usa el campo 'message' de la DE de entrada como fallback.
+    let messageToSend = personalizeText(templateMessage, activityPayload) || message;
 
-    log("Valores recuperados de la actividad:", {
+    log("Valores recuperados y personalizados de la actividad:", {
           staticValues: { customText, selectedTemplate },
           resolvedValues: { deFieldValue, phone, message, templateMessage, messageToSend }
         });
 
-    // Preparar el cuerpo de la petición para el servicio de push
+    // Preparar el cuerpo de la petición (payload) que se enviará al servicio externo.
     const pushPayload = {
       contactKey: activityPayload.keyValue, // El ContactKey del Journey
       dataFromActivity: {
@@ -100,45 +147,47 @@ router.post("/execute", verifyJWT, async (req, res) => {
         selectedTemplate,
         deFieldValue,
         phone,
-        message: messageToSend
+        message: messageToSend // Se envía el mensaje ya personalizado.
       }
     };
     
-    // Enviar datos al servicio mock de push
+    // Llamar al servicio externo para enviar el push.
     const pushResponse = await sendPush(pushPayload);
 
+    // Validar la respuesta del servicio externo.
     if (pushResponse.status >= 200 && pushResponse.status < 300) {
       log("Llamada al servicio push realizada con éxito", { 
         status: pushResponse.status,
         response: pushResponse.data 
       });
       
-      // Devolver respuesta OK a Marketing Cloud
+      // Devolver una respuesta de éxito a Marketing Cloud.
       return res.status(200).json({ 
         status: "ok", 
         result: pushResponse.data
       });
     } else {
-      // Este bloque es por si axios se configurara para no lanzar error en códigos 4xx/5xx
+      // Si el servicio externo devuelve un error, lo lanzamos para que lo capture el bloque catch.
       throw new Error(`El servicio push respondió con un estado inesperado: ${pushResponse.status}`);
     }
   } catch (pushError) {
-    log("Error al enviar la petición al servicio push", { 
+    log("Error durante la ejecución del push", { 
         error: pushError.message, 
         status: pushError.response?.status,
         data: pushError.response?.data
       });
       
-      // Devolver error a Marketing Cloud
-      return res.status(500).json({ 
-        status: "error", 
-        message: "Fallo al enviar los datos al servicio de push.",
-        details: {
-          errorMessage: pushError.message,
-          statusCode: pushError.response?.status
-        }
-      });
-    }
+    // Devolver una respuesta de error a Marketing Cloud.
+    return res.status(500).json({ 
+      status: "error", 
+      message: "Fallo al enviar los datos al servicio de push.",
+      details: {
+        errorMessage: pushError.message,
+        statusCode: pushError.response?.status
+      }
+    });
+  }
 });
 
+// Exportar el router para que pueda ser importado y utilizado en index.js
 module.exports = router;

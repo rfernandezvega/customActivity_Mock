@@ -1,45 +1,61 @@
-// Esperar a que el DOM esté completamente cargado antes de ejecutar el script
+/**
+ * @file ui.js
+ * @description Lógica del frontend para la interfaz de configuración de la Custom Activity.
+ * Este script se comunica con Journey Builder a través de la librería Postmonger para
+ * cargar datos, construir la interfaz de usuario dinámicamente y guardar la configuración
+ * final de la actividad.
+ */
+
+// Esperar a que el DOM (la estructura HTML) esté completamente cargado antes de ejecutar el script.
+// Esto previene errores al intentar acceder a elementos que aún no existen.
 document.addEventListener('DOMContentLoaded', () => {
 
-  // Iniciar comunicación con Journey Builder
+  // --- Variables Globales y Configuración ---
+
+  // Iniciar la sesión de comunicación con Journey Builder. 'connection' es el objeto principal para enviar y recibir eventos.
   const connection = new Postmonger.Session();
 
-  // Payload para pasarle a la actividad con la configuración
+  // Objeto que almacenará la configuración completa de la actividad. Se construye y modifica a lo largo del script.
   let payload = {};
   
-  // Almacenará los campos de la DE
+  // Almacenará el esquema de la fuente de entrada del Journey (los campos de la DE) una vez recibido de Journey Builder.
   let schemaFields = [];
 
-  // Almacenará las plantillas para la picklist
+  // Almacenará la lista de templates (con id, nombre y mensaje) obtenida desde nuestro backend.
   let deTemplates = []; 
   
-  // Campos que queremos obtener de la DE. Se indican aquí para que, si luego se cambia el nombre, no se tenga que modificar en más sitios.
+  // Campos "hard-coded" que la actividad siempre necesita resolver desde la fuente de entrada.
+  // Definirlos aquí facilita el mantenimiento.
   const requiredFields = {
     phone: 'MobilePhone',
     message: 'SMSMessage',
     from: 'SMSFrom'
   };
 
+  
+  // --- Listeners de Eventos de Postmonger ---
+
   /*
-    Los siguientes bloques son listeners que se ejecutan cuando los llama Journey Builder (on) o los requiere la app (trigger)
+    Documentación de Postmonger:
     https://developer.salesforce.com/docs/marketing/marketing-cloud/guide/using-postmonger.html
   */
   
-  /* 
-    Cuando se inicia la actividad (se arrastra la actividad al canvas o se hace click) se revisa si data contiene la configuración guardada.
-    Si la tiene se pasa al payload y se monta la estructura que esta definida en el config.json
-  */
+  /**
+   * Evento 'initActivity': Se dispara una sola vez cuando la interfaz se carga.
+   * Su propósito es inicializar el script, cargar la configuración guardada si existe,
+   * y comenzar el proceso de obtención de datos dinámicos.
+   * @param {object} data - Contiene el objeto 'payload' de una configuración guardada previamente. Es nulo si es una actividad nueva.
+   */
   connection.on("initActivity", function(data) 
   {
     if (data) {
       payload = data;
     }
       
-    /* Este bloque es una medida de seguridad. Se asegura de que la estructura payload.arguments.execute.inArguments 
-        exista, incluso si la actividad es nueva 
-      Si no se hiciera esto y se tratara de utilizar payload.arguments.execute.inArguments.push() (más adelante), 
-      daría un error porque se está intentando acceder a una propiedad (push) de algo que no existe (undefined).
-      En este caso, no se está guardando nada en el /save, por lo que es necesario definirlo.
+    /* 
+      Este bloque es una medida de seguridad. Se asegura de que la estructura del payload
+      (payload.arguments.execute.inArguments) exista, incluso si la actividad es nueva.
+      Sin esto, intentar hacer .push() sobre un array indefinido causaría un error.
     */
     if (!payload.arguments) {
       payload.arguments = {};
@@ -51,36 +67,34 @@ document.addEventListener('DOMContentLoaded', () => {
       payload.arguments.execute.inArguments = [{}];
     } 
 
-    // Solicitar schema de entrada al journey. Es decir, se solicita la lista de todos los campos disponibles en la DE de entrada.
+    // Solicitar a Journey Builder el esquema de la fuente de entrada. Esto disparará el evento 'requestedSchema'.
     connection.trigger('requestSchema');       
-    
   });
 
-  /* 
-    Este listener se dispara cuando MC envía el esquema de la DE.
-    Su responsabilidad es orquestar la carga de todo el contenido dinámico.
-    Se ha solicitado al cargar la actividad.
-
-    El objetivo es construir los inArguments, que es la parte más importante del payload. 
-    Los inArguments le indican al endpoint /execute de dónde sacar los valores datos.
-  */
+  /**
+   * Evento 'requestedSchema': Se dispara cuando Journey Builder responde a nuestra petición de 'requestSchema'.
+   * Es el orquestador principal de la UI: construye los desplegables dinámicos y luego rellena el formulario.
+   * @param {object} data - Objeto que contiene la propiedad 'schema' con la lista de campos de la fuente de entrada.
+   */
   connection.on('requestedSchema', async function (data) {
     const loaderContainer = document.getElementById('loader-container');
     const formContainer = document.getElementById('form-container');
 
     try {
-      // Verificar si tenemos schema
+      // Validar si la fuente de entrada está configurada. Si no, mostrar un error.
       if (!data || !data.schema || data.schema.length === 0) {
         loaderContainer.innerHTML = '<p>Debes configurar primero la entrada al Journey</p>';
         loaderContainer.className = 'error';
         formContainer.style.display = 'none';
-        connection.trigger('updateButton', { button: 'next', enabled: false });
+        connection.trigger('updateButton', { button: 'next', enabled: false }); // Desactivar el botón de guardar.
         return;
       }
+
+      // Si hay un esquema válido, ocultar el loader y mostrar el formulario.
       loaderContainer.style.display = 'none';
       formContainer.style.display = 'block';
 
-      // --- Paso 1: Construir la parte síncrona (lista de campos de la DE) ---
+      // --- Paso 1: Construir el desplegable de campos de la DE (síncrono) ---
       schemaFields = data.schema; 
       const deFieldSelect = document.getElementById('de-field-picklist');
       deFieldSelect.innerHTML = ''; 
@@ -93,22 +107,20 @@ document.addEventListener('DOMContentLoaded', () => {
       schemaFields.forEach(field => {
         const option = document.createElement('option');
         option.innerText = field.name; // Lo que ve el usuario (ej: "FirstName")
-        option.value = `{{${field.key}}}`; // El valor guardado (ej: "{{Event.APIEvent-XYZ.FirstName}}")
+        option.value = `{{${field.key}}}`; // El valor guardado, el data binding completo.
         deFieldSelect.appendChild(option);
       });
       
-      // --- Paso 2: ESPERAR a que la parte asíncrona (templates) termine de construirse ---
+      // --- Paso 2: ESPERAR a que el desplegable de templates (asíncrono) termine de construirse ---
       await populateDETemplates();
 
-      // --- Paso 3: AHORA, y solo ahora, rellenamos el formulario con los datos guardados ---
+      // --- Paso 3: AHORA que toda la UI está lista, rellenar el formulario con los datos guardados ---
       loadFormData();
 
-      // --- Paso 4: Añadimos los listeners de eventos ---
+      // --- Paso 4: Añadir el listener de eventos para la vista previa del mensaje ---
       document.getElementById('template-de-picklist').addEventListener('change', updateMessagePreview);
 
-      /* Le decimos a Journey Builder que active el botón "Siguiente" / "Hecho". 
-        Si no hicieras esto, el botón estaría deshabilitado y el usuario no podría guardar la configuración.
-      */
+      // --- Paso 5: Activar el botón de "Hecho" de Journey Builder ---
       connection.trigger('updateButton', { button: 'next', enabled: true });
       
     } catch (error) {
@@ -116,38 +128,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Cuando se hace clic en Done/Next
+  /**
+   * Evento 'clickedNext': Se dispara cuando el usuario hace clic en el botón "Hecho" de Journey Builder.
+   * Su única responsabilidad es guardar los datos del formulario en el payload y enviarlo a Journey Builder.
+   */
   connection.on("clickedNext", function() {
     try 
     {
-      // Recoge todos los datos del formulario
       saveFormDataToPayload(); 
-      // Se le indica a Journey Builder que debe cerrar la ventana y que la configuración está lista
+      // Enviar el payload final a Journey Builder para que lo guarde.
       connection.trigger("updateActivity", payload);
     } catch (error) {
       console.error("Error al guardar:", error);
     }
   });
 
-  // Notificar que estamos listos. La primera vez que se usar el ready, JB llama a initActivity o initEvent.
+  // Notificar que estamos listos. Este es el primer trigger que se envía y causa que Journey Builder responda con 'initActivity'.
   connection.trigger("ready");
 
 
-  //  Función para poblar los templates desde la DE 
+  // --- Funciones Auxiliares de la UI ---
+
   /**
-   * Llama al backend para obtener los templates de la DE y rellena la lista de selección.
+   * Llama al endpoint /api/templates del backend para obtener los templates de la DE,
+   * y luego construye las opciones del desplegable correspondiente.
    */
   async function populateDETemplates() {
     const select = document.getElementById('template-de-picklist');
     try {
-      // La URL debe apuntar a tu servidor.
       const response = await fetch('/api/templates');
       if (!response.ok) {
         throw new Error(`El servidor respondió con estado ${response.status}`);
       }
 
+      // Guardar la lista completa de templates (con mensajes) en la variable global.
       deTemplates = await response.json();
-
       select.innerHTML = ''; // Limpiar el mensaje de "Cargando..."
       
       if (deTemplates.length === 0) {
@@ -155,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Añadir una opción por defecto
       const defaultOption = document.createElement('option');
       defaultOption.value = '';
       defaultOption.innerText = '-- Seleccione una plantilla --';
@@ -165,7 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const option = document.createElement('option');
         option.value = template.id;
         option.innerText = template.name;
-        // Guardamos el mensaje en el propio elemento HTML para fácil acceso
+        // Guardamos el mensaje en un atributo 'data-*' en el propio elemento HTML.
+        // Esto hace que el acceso posterior sea robusto y no dependa de la caché.
         option.setAttribute('data-message', template.message);
         select.appendChild(option);
       });
@@ -177,7 +192,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /**
-   * Lee los datos del 'payload' y los usa para rellenar los campos del formulario.
+   * Lee la configuración guardada en el objeto 'payload' y la usa para
+   * rellenar los campos del formulario con sus valores correspondientes.
    * Esto asegura que al editar una actividad, el usuario vea su configuración anterior.
    */
   function loadFormData() {
@@ -185,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
     {
       const inArgs = payload.arguments.execute.inArguments[0];
 
-      // Rellenar cada campo del formulario con el valor guardado o un valor por defecto
+      // Rellenar cada campo del formulario con el valor guardado, o un valor por defecto si no existe.
       document.getElementById('text-input').value = inArgs.customText || '';
       document.getElementById('template-picklist').value = inArgs.selectedTemplate || 'Template1';
       document.getElementById('de-field-picklist').value = inArgs.selectedDEField || '';
@@ -193,14 +209,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const selectedTemplateId = inArgs.selectedTemplateId || '';
       document.getElementById('template-de-picklist').value = selectedTemplateId;
       
-      // Si hay un template seleccionado al cargar, mostrar su mensaje
+      // Llamar a la función de vista previa para mostrar el mensaje si hay un template seleccionado al cargar.
       updateMessagePreview();
     }
   }
 
-  // Función para actualizar la vista previa 
   /**
-   * Se ejecuta cada vez que el usuario cambia la selección del desplegable de templates.
+   * Muestra u oculta la vista previa del mensaje de la plantilla.
+   * Se ejecuta cuando se carga el formulario y cada vez que el usuario cambia la
+   * selección del desplegable de templates.
    */
   function updateMessagePreview() {
     const select = document.getElementById('template-de-picklist');
@@ -209,56 +226,50 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const selectedId = select.value;
 
-    // Si no hay nada seleccionado, ocultar la vista previa
     if (!selectedId) {
       previewContainer.style.display = 'none';
       return;
     }
     
-    // Buscar el template seleccionado en nuestro array de templates guardados
+    // Buscar el template seleccionado en nuestro array de templates en caché.
     const selectedTemplate = deTemplates.find(t => String(t.id) === selectedId);
 
     if (selectedTemplate && selectedTemplate.message) {
-      // Si encontramos el template y tiene un mensaje, lo mostramos
+      // Si encontramos el template, mostramos su mensaje.
       messageTextSpan.innerText = selectedTemplate.message;
       previewContainer.style.display = 'block';
     } else {
-      // Si no, ocultamos la vista previa (por si acaso)
+      // Si no, ocultamos la vista previa.
       previewContainer.style.display = 'none';
     }
   }
 
-  // Función para guardar los datos del formulario en el payload 
   /**
    * Recoge todos los valores actuales del formulario y los guarda en la estructura
-   * 'inArguments' del payload.
+   * 'inArguments' del objeto 'payload'. También construye los data bindings necesarios.
    */
   function saveFormDataToPayload() {
     const inArgs = {};
 
-    // Recoge los valores de los campos del formulario
+    // Recoger los valores de cada campo del formulario.
     inArgs.customText = document.getElementById('text-input').value;
     inArgs.selectedTemplate = document.getElementById('template-picklist').value;
     inArgs.selectedDEField = document.getElementById('de-field-picklist').value;
     
-    // --- Lógica de guardado rediseñada ---
     const templateSelect = document.getElementById('template-de-picklist');
     const selectedTemplateId = templateSelect.value;
     inArgs.selectedTemplateId = selectedTemplateId;
 
-    // Si hay una opción seleccionada...
+    // Si hay una opción seleccionada, leer el mensaje desde su atributo data-message.
     if (selectedTemplateId) {
-        // Obtenemos el elemento <option> seleccionado
         const selectedOption = templateSelect.options[templateSelect.selectedIndex];
         if (selectedOption) {
-            // Leemos el mensaje directamente desde su atributo data-message
             inArgs.selectedTemplateMessage = selectedOption.getAttribute('data-message');
         }
     }
 
-    // Añadir los valores "hard-coded" (phone, message, etc.) usando el esquema guardado
-    // Extraer el eventDefinitionKey (UUID del evento)
-    // Formato ejemplo de la Key: Event.APIEvent-1a11c-7952-488a-99d7-069fa2bc543c.Id
+    // --- Construcción de los Data Bindings ---
+    // Extraer el eventDefinitionKey (UUID del evento) del esquema para crear bindings robustos.
     let eventDefinitionKey = "";
     if (schemaFields.length > 0) {
       const firstKey = schemaFields[0].key;
@@ -268,30 +279,25 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }        
     
-    /* 
-      Si encontramos el eventDefinitionKey, crear bindings completos 
-      Esto se podría indicar directamente en el config.json, pero en este caso los nombres
-      de los campos de la DE siempre deberían ser los indicados en el archivo de configuración.
-    */
     if (eventDefinitionKey) {
       inArgs.phone = `{{Event.${eventDefinitionKey}.${requiredFields.phone}}}`;
       inArgs.message = `{{Event.${eventDefinitionKey}.${requiredFields.message}}}`;
       inArgs.from = `{{Event.${eventDefinitionKey}.${requiredFields.from}}}`;
     } else {
-      // Si no encontramos el eventDefinitionKey, se puede intentar recuperar de ContactData
+      // Fallback si no se encuentra el eventDefinitionKey.
       inArgs.phone = `{{Contact.Attribute.DataExtension.${requiredFields.phone}}}`;
       inArgs.message = `{{Contact.Attribute.DataExtension.${requiredFields.message}}}`;
       inArgs.from = `{{Contact.Attribute.DataExtension.${requiredFields.from}}}`;
     }
 
-    // Reemplazar los argumentos en el payload con el nuevo objeto construido
+    // Reemplazar los argumentos en el payload con el nuevo objeto construido.
     payload.arguments.execute.inArguments = [inArgs];
 
-    // Marcar la actividad como configurada. Necesario para que JB permita activar
+    // Marcar la actividad como configurada. Necesario para que JB permita activar.
     if (!payload.metaData) {
       payload.metaData = {};
     }
     payload.metaData.isConfigured = true;
   }
 
-});
+}); // Fin del listener DOMContentLoaded

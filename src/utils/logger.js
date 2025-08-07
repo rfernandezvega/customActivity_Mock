@@ -10,8 +10,5 @@ function log(message, data = null) {
 
 /*
     Hace que la función de log esté disponible para ser utilizada en otros archivos del proyecto
-    En Node.js, cada archivo es un módulo. 
-    Para que una función, clase, objeto, etc., esté accesible fuera de ese archivo se debe exportar.
-
 */
 module.exports = log;
