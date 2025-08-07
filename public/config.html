@@ -183,6 +183,9 @@
               <option value="">-- Cargando templates... --</option>
           </select>
           <div class="field-desc">La plantilla seleccionada se guardará como 'selectedTemplateId'.</div>
+          <div id="template-message-preview" style="margin-top: 10px; padding: 10px; background-color: #f3f3f3; border-radius: 4px; font-style: italic; display: none;">
+              <strong>Mensaje:</strong> <span id="message-text"></span>
+          </div>
         </div>
 
         <div class="form-field">
@@ -303,10 +306,13 @@
           });
           
           // Llamar a la función que rellena la lista de templates de la DE
-          populateDeTemplates();
+          populateDETemplates();
 
           // Carga los datos del formulario después de construir el desplegable
           loadFormData();
+
+          // Añadir el listener al desplegable para mostrar/ocultar la vista previa del mensaje
+          document.getElementById('template-de-picklist').addEventListener('change', updateMessagePreview);
 
           /* Le decimos a Journey Builder que active el botón "Siguiente" / "Hecho". 
             Si no hicieras esto, el botón estaría deshabilitado y el usuario no podría guardar la configuración.
@@ -339,7 +345,7 @@
     /**
      * Llama al backend para obtener los templates de la DE y rellena la lista de selección.
      */
-    async function populateDeTemplates() {
+    async function populateDETemplates() {
       const select = document.getElementById('template-de-picklist');
       try {
         // La URL debe apuntar a tu servidor. En desarrollo puede ser relativa,
@@ -378,13 +384,50 @@
        * Esto asegura que al editar una actividad, el usuario vea su configuración anterior.
        */
       function loadFormData() {
-        if (payload.arguments && payload.arguments.execute && payload.arguments.execute.inArguments.length > 0) {
+        if (payload.arguments && payload.arguments.execute && payload.arguments.execute.inArguments.length > 0) 
+        {
           const inArgs = payload.arguments.execute.inArguments[0];
 
           // Rellenar cada campo del formulario con el valor guardado o un valor por defecto
           document.getElementById('text-input').value = inArgs.customText || '';
           document.getElementById('template-picklist').value = inArgs.selectedTemplate || 'Template1';
           document.getElementById('de-field-picklist').value = inArgs.selectedDEField || '';
+
+          const selectedTemplateId = inArgs.selectedTemplateId || '';
+          document.getElementById('template-de-picklist').value = selectedTemplateId;
+          
+          // Si hay un template seleccionado al cargar, mostrar su mensaje
+          updateMessagePreview();
+        }
+      }
+
+      // Función para actualizar la vista previa 
+      /**
+       * Se ejecuta cada vez que el usuario cambia la selección del desplegable de templates.
+       */
+      function updateMessagePreview() {
+        const select = document.getElementById('template-de-picklist');
+        const previewContainer = document.getElementById('template-message-preview');
+        const messageTextSpan = document.getElementById('message-text');
+        
+        const selectedId = select.value;
+
+        // Si no hay nada seleccionado, ocultar la vista previa
+        if (!selectedId) {
+          previewContainer.style.display = 'none';
+          return;
+        }
+        
+        // Buscar el template seleccionado en nuestro array de templates guardados
+        const selectedTemplate = deTemplates.find(t => t.id === selectedId);
+
+        if (selectedTemplate && selectedTemplate.message) {
+          // Si encontramos el template y tiene un mensaje, lo mostramos
+          messageTextSpan.innerText = selectedTemplate.message;
+          previewContainer.style.display = 'block';
+        } else {
+          // Si no, ocultamos la vista previa (por si acaso)
+          previewContainer.style.display = 'none';
         }
       }
 
@@ -399,6 +442,7 @@
         // Recoge los valores de los campos del formulario
         inArgs.customText = document.getElementById('text-input').value;
         inArgs.selectedTemplate = document.getElementById('template-picklist').value;
+        inArgs.selectedTemplateId = document.getElementById('template-de-picklist').value;
         inArgs.selectedDEField = document.getElementById('de-field-picklist').value;
 
         // Añadir los valores "hard-coded" (phone, message, etc.) usando el esquema guardado
