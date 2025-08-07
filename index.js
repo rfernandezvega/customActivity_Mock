@@ -16,6 +16,14 @@ const app = express();
 */
 const port = process.env.PORT || 3000;
 
+/*
+  Variables para la caché del token
+  Se declaran en un ámbito superior para que persistan entre peticiones.
+*/
+let cachedToken = null;
+// Almacenará el timestamp de expiración en milisegundos
+let tokenExpiresAt = null; .
+
 // Funcion para logs de produccion - minimos pero informativos
 function log(message, data = null) {
   const timestamp = new Date().toISOString();
@@ -70,10 +78,9 @@ app.use(express.static(path.join(__dirname, "public")));
 // Middleware para validacion JWT
 function verifyJWT(req, res, next) 
 {
-  log("--- INICIANDO VERIFICACIÓN JWT ---");
+  log("--- Validación JWT ---");
   log("Cabeceras de la petición:", req.headers);
   log("Cuerpo completo de la petición:", req.body);
-  log("--- FIN DE DATOS DE DEPURACIÓN ---");
 
    let token;
   // Comprobar si el body es una cadena (el caso de application/jwt)
@@ -266,36 +273,50 @@ app.post("/execute", verifyJWT, async (req, res) => {
 
     // -- Paso 1: Obtener el token de autenticación del servicio mock --
     let accessToken;
-    try {
-      log("Solicitando token de acceso al servicio mock...");
-      const tokenResponse = await axios.post('https://b9b67f2c-daf7-47aa-b8d7-8f42e290511a.mock.pstmn.io/token', {});
+    // Comprobar si tenemos un token en caché Y si no ha expirado
+    // Se añade un buffer de seguridad de 60 segundos.
+    if (cachedToken && Date.now() < (tokenExpiresAt - 60000)) {
+      log("Usando token válido desde la caché.");
+      accessToken = cachedToken;
+    } else {
+      // Si no hay token o ha expirado (o está a punto de), pedimos uno nuevo
+      log("Token no encontrado en caché o expirado. Solicitando uno nuevo...");
+
+      try {
+        log("Solicitando token de acceso al servicio mock...");
+        const tokenResponse = await axios.post('https://b9b67f2c-daf7-47aa-b8d7-8f42e290511a.mock.pstmn.io/token', {});
+        
+        if (!tokenResponse.data || !tokenResponse.data.access_token || !tokenResponse.data.expires_in) {
+          throw new Error("La respuesta del servicio de token es inválida o no contiene un 'access_token' y 'expires_in'.");
+        }
+
+         // Guardar el nuevo token y calcular su fecha de expiración
+        accessToken = tokenResponse.data.access_token;
+        const expiresInSeconds = tokenResponse.data.expires_in;
+        
+        cachedToken = accessToken;
+        tokenExpiresAt = Date.now() + (expiresInSeconds * 1000); // Convertir segundos a milisegundos
       
-      if (!tokenResponse.data || !tokenResponse.data.access_token) {
-        throw new Error("La respuesta del servicio de token es inválida o no contiene un 'access_token'.");
+        log("Nuevo token obtenido y guardado en caché.", { expiresAt: new Date(tokenExpiresAt).toISOString() });
+      } catch (tokenError) {
+        log("Error al obtener el token de acceso", { 
+          error: tokenError.message, 
+          status: tokenError.response?.status,
+          data: tokenError.response?.data
+        });
+        // Devolver error a Marketing Cloud
+        return res.status(500).json({ 
+          status: "error", 
+          message: "Fallo al obtener el token de autenticación del servicio externo."
+        });
       }
-
-      accessToken = tokenResponse.data.access_token;
-     
-      log("Token de acceso obtenido con éxito.");
-
-    } catch (tokenError) {
-      log("Error al obtener el token de acceso", { 
-        error: tokenError.message, 
-        status: tokenError.response?.status,
-        data: tokenError.response?.data
-      });
-      // Devolver error a Marketing Cloud
-      return res.status(500).json({ 
-        status: "error", 
-        message: "Fallo al obtener el token de autenticación del servicio externo."
-      });
     }
 
     // -- Paso 2: Enviar los datos al servicio de push con el token --
     
     // Preparar el cuerpo de la petición para el servicio de push
     const pushPayload = {
-      contactKey: req.body.keyValue, // El ContactKey del Journey
+      contactKey: activityPayload.keyValue, // El ContactKey del Journey
       dataFromActivity: {
         customText,
         selectedTemplate,
@@ -350,7 +371,7 @@ app.post("/execute", verifyJWT, async (req, res) => {
           statusCode: pushError.response?.status
         }
       });
-  }
+    }
 });
 
 
