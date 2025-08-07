@@ -180,7 +180,7 @@ app.get("/api/templates", async (req, res) => {
         name: item.values.templatename,
         message: item.values.templatemessage
       }));
-      log(`Se encontraron ${templates.length} templates.`);
+      log(`Se encontraron ${templates.length} templates.`, templates);
       res.status(200).json(templates);
     } else {
       res.status(200).json([]); // Devolver un array vacío si no hay items

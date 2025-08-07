@@ -200,7 +200,7 @@
       </div>
 
       <div class="info-box note">
-        <strong>Nota:</strong> Asegúrese de que los campos `MobilePhone` y `SMSMessage` existan en la fuente de entrada del Journey.
+        <strong>Nota:</strong> Asegúrese de que los campos 'MobilePhone', 'SMSMessage' y 'SMSFrom' existan en la fuente de entrada del Journey.
       </div>
     </div>
 
@@ -213,6 +213,9 @@
       
       // Almacenará los campos de la DE
       let schemaFields = [];
+
+      // ALmacenará las plantillas para la picklist
+      let deTemplates = []; 
       
       // Campos que queremos obtener de la DE. Se indican aquí para que, si luego se cambia el nombre, no se tenga que modificar en más sitios.
       const requiredFields = {
@@ -354,16 +357,23 @@
         if (!response.ok) {
           throw new Error(`El servidor respondió con estado ${response.status}`);
         }
-        const templates = await response.json();
+
+        deTemplates = await response.json();
 
         select.innerHTML = ''; // Limpiar el mensaje de "Cargando..."
         
-        if (templates.length === 0) {
+        if (deTemplates.length === 0) {
           select.innerHTML = '<option value="">-- No se encontraron templates --</option>';
           return;
         }
 
-        templates.forEach(template => {
+        // Añadir una opción por defecto
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.innerText = '-- Seleccione una plantilla --';
+        select.appendChild(defaultOption);
+
+        deTemplates.forEach(template => {
           const option = document.createElement('option');
           option.value = template.id;
           option.innerText = template.name;
