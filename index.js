@@ -288,8 +288,6 @@ async function getSfmcAccessToken() {
       const CLIENT_SECRET = process.env.CLIENT_SECRET;
       const MID = process.env.MID;
 
-      // Validar que las variables de entorno necesarias existen.
-      const { AUTH_URI, CLIENT_ID, CLIENT_SECRET, MID } = process.env;
       if (!AUTH_URI || !CLIENT_ID || !CLIENT_SECRET || !MID) {
         throw new Error("Las variables de entorno de la API de SFMC no están configuradas.");
       }
