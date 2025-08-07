@@ -112,6 +112,14 @@
         </div>
       </div>
       
+      <div class="form-field">
+        <label for="template-de-picklist">Seleccionar Template (desde DE)</label>
+        <select id="template-de-picklist">
+            <option value="">-- Cargando templates... --</option>
+        </select>
+        <div class="field-desc">La plantilla seleccionada se guardará como 'selectedTemplateId'.</div>
+      </div>
+
       <div class="note">
         <strong>Nota:</strong> Asegúrese de que los campos necesarios existan en la Data Extension de entrada al Journey.
       </div>
@@ -197,7 +205,7 @@
           }
           loaderContainer.style.display = 'none';
           formContainer.style.display = 'block';
-          
+
           // Guardar el esquema para usarlo al guardar
           schemaFields = data.schema; 
           // Recupera la picklist de los valores de campos
@@ -218,6 +226,9 @@
             option.value = `{{${field.key}}}`; // El valor guardado (ej: "{{Event.APIEvent-XYZ.FirstName}}")
             deFieldSelect.appendChild(option);
           });
+          
+          // Llamar a la función que rellena la lista de templates de la DE
+          populateDeTemplates();
 
           // Carga los datos del formulario después de construir el desplegable
           loadFormData();
@@ -247,6 +258,45 @@
 
       // Notificar que estamos listos. La primera vez que se usar el ready, JB llama a initActivity o initEvent.
       connection.trigger("ready");
+
+
+    //  Función para poblar los templates desde la DE 
+    /**
+     * Llama al backend para obtener los templates de la DE y rellena la lista de selección.
+     */
+    async function populateDeTemplates() {
+      const select = document.getElementById('template-de-picklist');
+      try {
+        // La URL debe apuntar a tu servidor. En desarrollo puede ser relativa,
+        // pero en producción debe ser la URL completa de tu app.
+        const response = await fetch('/api/templates');
+        if (!response.ok) {
+          throw new Error(`El servidor respondió con estado ${response.status}`);
+        }
+        const templates = await response.json();
+
+        select.innerHTML = ''; // Limpiar el mensaje de "Cargando..."
+        
+        if (templates.length === 0) {
+          select.innerHTML = '<option value="">-- No se encontraron templates --</option>';
+          return;
+        }
+
+        templates.forEach(template => {
+          const option = document.createElement('option');
+          option.value = template.id;
+          option.innerText = template.name;
+          select.appendChild(option);
+        });
+
+        // Volver a cargar los datos del formulario por si la respuesta de la API llegó tarde
+        loadFormData();
+
+      } catch (error) {
+        console.error('Error al cargar templates de la DE:', error);
+        select.innerHTML = '<option value="">-- Error al cargar --</option>';
+      }
+    }
 
       /**
        * Lee los datos del 'payload' y los usa para rellenar los campos del formulario.

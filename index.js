@@ -26,6 +26,15 @@ let tokenExpiresAt = null;
 // Variable para manejar la promesa pendiente de obtener un token.
 let tokenPromise = null; 
 
+// Caché para el token de la API de SFMC
+/*
+  Variables para la caché del token de la API de Marketing Cloud.
+  Es independiente del token del servicio mock.
+*/
+let sfmcCachedToken = null;
+let sfmcTokenExpiresAt = null;
+let sfmcTokenPromise = null;
+
 // Funcion para logs de produccion - minimos pero informativos
 function log(message, data = null) {
   const timestamp = new Date().toISOString();
@@ -143,6 +152,44 @@ app.get("/config.json", (req, res) => {
   res.sendFile(path.join(__dirname, "config.json"));
 });
 
+app.get("/api/templates", async (req, res) => {
+  log("Recibida petición para obtener templates de la DE.");
+  try {
+    const accessToken = await getSfmcAccessToken();
+    const restUri = process.env.REST_URI;
+    const deCustomerKey = "Templates"; // La clave externa de tu Data Extension
+
+    if (!restUri) {
+      throw new Error("La variable de entorno REST_URI no está configurada.");
+    }
+    
+    // Construir la URL para obtener las filas de la DE
+    const requestUrl = `${restUri}/data/v1/customobjectdata/key/${deCustomerKey}/rowset`;
+
+    log("Solicitando datos de la DE 'Templates' a la API de SFMC.");
+    const deResponse = await axios.get(requestUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    // Procesar la respuesta para que sea fácil de usar en el frontend
+    if (deResponse.data && deResponse.data.items) {
+      const templates = deResponse.data.items.map(item => ({
+        id: item.values.templateid, // Asegúrate de que los nombres de campo son correctos y en minúsculas
+        name: item.values.templatename
+      }));
+      log(`Se encontraron ${templates.length} templates.`);
+      res.status(200).json(templates);
+    } else {
+      res.status(200).json([]); // Devolver un array vacío si no hay items
+    }
+  } catch (error) {
+    log("Error en el endpoint /api/templates.", { error: error.message });
+    res.status(500).json({ error: "No se pudieron obtener los templates." });
+  }
+});
+
 app.post("/save", (req, res) => {
   log("Recibida petición de validación en /save");
   res.status(200).json({ success: true });
@@ -214,6 +261,65 @@ async function getAccessToken() {
   });
 
   return tokenPromise;
+}
+
+async function getSfmcAccessToken() {
+  // Caso 1: Usar token de la caché si es válido.
+  if (sfmcCachedToken && Date.now() < (sfmcTokenExpiresAt - 60000)) {
+    log("Usando token de SFMC válido desde la caché.");
+    return sfmcCachedToken;
+  }
+
+  // Caso 2: Esperar a una petición de token que ya está en curso.
+  if (sfmcTokenPromise) {
+    log("Esperando a que otra petición complete la obtención del token de SFMC...");
+    return sfmcTokenPromise;
+  }
+
+  // Caso 3: Pedir un nuevo token.
+  log("Solicitando nuevo token de acceso para la API de SFMC...");
+  
+  sfmcTokenPromise = new Promise(async (resolve, reject) => {
+    try {
+      // Validar que las variables de entorno necesarias existen.
+      const { AUTH_URI, CLIENT_ID, CLIENT_SECRET, MID } = process.env;
+      if (!AUTH_URI || !CLIENT_ID || !CLIENT_SECRET || !MID) {
+        throw new Error("Las variables de entorno de la API de SFMC no están configuradas.");
+      }
+
+      const authPayload = {
+        grant_type: "client_credentials",
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        account_id: MID
+      };
+
+      const response = await axios.post(AUTH_URI, authPayload, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.data || !response.data.access_token) {
+        throw new Error("La respuesta de autenticación de SFMC es inválida.");
+      }
+      
+      const accessToken = response.data.access_token;
+      const expiresInSeconds = response.data.expires_in;
+
+      sfmcCachedToken = accessToken;
+      sfmcTokenExpiresAt = Date.now() + (expiresInSeconds * 1000);
+
+      log("Nuevo token de SFMC obtenido y guardado en caché.");
+      resolve(accessToken);
+
+    } catch (error) {
+      log("Error al obtener el token de SFMC.", { error: error.message });
+      reject(error);
+    } finally {
+      sfmcTokenPromise = null;
+    }
+  });
+
+  return sfmcTokenPromise;
 }
 
 // Funcion para extraer el valor de un data binding
