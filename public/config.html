@@ -5,71 +5,137 @@
     <title>Custom Activity Mock</title>
     <script src="https://unpkg.com/postmonger"></script>
     <style>
-      /* --- CSS ACTUALIZADO --- */
+      :root {
+        --brand-primary: #0070d2;
+        --background-color: #f3f3f3;
+        --card-background: #ffffff;
+        --text-color: #181818;
+        --label-color: #3e3e3e;
+        --border-color: #dddbda;
+        --border-radius: 0.25rem;
+        --input-background: #ffffff;
+        --info-background: #f3f9fe;
+        --info-border: #0070d2;
+        --note-background: #fff9e3;
+        --note-border: #ffb75d;
+      }
+
       body {
-        font-family: Arial, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--background-color);
         padding: 20px;
-        color: #333;
+        color: var(--text-color);
         margin: 0;
       }
-      /* Contenedor para el mensaje de error/espera */
+
       #loader-container {
         text-align: center;
         padding-top: 50px;
         font-size: 16px;
         color: #666;
       }
-      /* Estilo específico para el mensaje de error */
       #loader-container.error {
         font-weight: bold;
-        color: #d9534f; /* Rojo de Bootstrap para 'danger' */
+        color: #c23934;
       }
-      /* El contenedor principal del formulario, oculto por defecto */
+
       #form-container {
         display: none;
       }
-      h2 {
-        margin-top: 0;
-        margin-bottom: 25px;
-        color: #333;
-      }
-      .info-section {
-        background-color: #f8f9fa;
-        border-left: 4px solid #5bc0de;
-        padding: 15px;
+
+      .header {
+        padding-bottom: 10px;
         margin-bottom: 20px;
-        border-radius: 4px;
+        border-bottom: 1px solid var(--border-color);
       }
+      .header h2 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .form-section {
+        background-color: var(--card-background);
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        padding: 20px;
+        margin-bottom: 20px;
+      }
+      
+      .section-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--brand-primary);
+        margin-top: 0;
+        margin-bottom: 20px;
+      }
+
       .form-field {
         margin-bottom: 20px;
       }
+      .form-field:last-child {
+        margin-bottom: 0;
+      }
+
       .form-field label {
         display: block;
-        font-weight: bold;
-        margin-bottom: 5px;
-        color: #0066cc;
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--label-color);
       }
+      
       .form-field input[type="text"],
       .form-field select {
         width: 100%;
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
+        padding: 10px;
+        font-size: 0.875rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        background-color: var(--input-background);
         box-sizing: border-box;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
       }
+      .form-field input[type="text"]:focus,
+      .form-field select:focus {
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 1px var(--brand-primary);
+        outline: 0;
+      }
+
+      /* Custom arrow for select dropdowns */
+      .form-field select {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+        background-repeat: no-repeat;
+        background-position: right 0.7em top 50%, 0 0;
+        background-size: 0.65em auto;
+      }
+
       .field-desc {
-        font-size: 12px;
-        margin-top: 5px;
-        color: #666;
+        font-size: 0.8rem;
+        margin-top: 8px;
+        color: #545454;
       }
-      .note {
-        background-color: #fffbd8;
-        border-left: 4px solid #ffd24d;
+      
+      .info-box {
         padding: 15px;
-        margin-top: 25px;
-        border-radius: 4px;
-        font-size: 14px;
+        margin-bottom: 20px;
+        border-radius: var(--border-radius);
+        font-size: 0.875rem;
+        border-left: 4px solid;
       }
+      .info-box.info {
+        background-color: var(--info-background);
+        border-color: var(--info-border);
+      }
+      .info-box.note {
+        background-color: var(--note-background);
+        border-color: var(--note-border);
+      }
+
     </style>
   </head>
   <body>    
@@ -80,51 +146,60 @@
 
     <!-- Contenedor para todo el formulario. Oculto por defecto. -->
     <div id="form-container">
-      <h2>Configuración de la Actividad</h2>
-      
-      <div class="info-section">
-        <p>Configura los parámetros que se enviarán en la llamada.</p>
+      <div class="header">
+        <h2>Configuración de la Actividad</h2>
       </div>
       
-      <div class="form-field">
-        <label for="text-input">Input Text</label>
-        <input type="text" id="text-input" placeholder="Introduzca un valor de texto"/>
-        <div class="field-desc">Este valor se enviará como 'customText' en los argumentos.</div>
+      <div class="info-box info">
+        <p>Configure los parámetros que se enviarán al servicio externo para cada contacto en el Journey.</p>
       </div>
-      
-      <div class="form-field">
-        <label for="template-picklist">Seleccionar Plantilla</label>
-        <select id="template-picklist">
-          <option value="Template1">Template 1</option>
-          <option value="Template2">Template 2</option>
-          <option value="Template3">Template 3</option>
-        </select>
-        <div class="field-desc">La plantilla seleccionada se enviará como 'selectedTemplate'.</div>
-      </div>
-      
-      <div class="form-field">
-        <label for="de-field-picklist">DE Field</label>
-        <select id="de-field-picklist">
-            <option value="">-- Campos de la DE... --</option>
-        </select>
-        <div class="field-desc">
-          Seleccione un campo de la Data Extension de entrada.
+
+      <!-- Sección de Configuración Estática -->
+      <div class="form-section">
+        <h3 class="section-title">Parámetros Estáticos</h3>
+        <div class="form-field">
+          <label for="text-input">Texto de Referencia</label>
+          <input type="text" id="text-input" placeholder="Introduzca un valor de texto"/>
+          <div class="field-desc">Este valor se enviará como 'customText' en los argumentos.</div>
+        </div>
+        
+        <div class="form-field">
+          <label for="template-picklist">Plantilla Fija</label>
+          <select id="template-picklist">
+            <option value="Template1">Template Fija 1</option>
+            <option value="Template2">Template Fija 2</option>
+            <option value="Template3">Template Fija 3</option>
+          </select>
+          <div class="field-desc">La plantilla seleccionada se enviará como 'selectedTemplate'.</div>
         </div>
       </div>
-      
-      <div class="form-field">
-        <label for="template-de-picklist">Seleccionar Template (desde DE)</label>
-        <select id="template-de-picklist">
-            <option value="">-- Cargando templates... --</option>
-        </select>
-        <div class="field-desc">La plantilla seleccionada se guardará como 'selectedTemplateId'.</div>
+
+      <!-- Sección de Configuración Dinámica -->
+      <div class="form-section">
+        <h3 class="section-title">Parámetros Dinámicos</h3>
+        <div class="form-field">
+          <label for="template-de-picklist">Plantilla desde Data Extension</label>
+          <select id="template-de-picklist">
+              <option value="">-- Cargando templates... --</option>
+          </select>
+          <div class="field-desc">La plantilla seleccionada se guardará como 'selectedTemplateId'.</div>
+        </div>
+
+        <div class="form-field">
+          <label for="de-field-picklist">Campo de la Fuente de Entrada</label>
+          <select id="de-field-picklist">
+              <option value="">-- Campos de la DE... --</option>
+          </select>
+          <div class="field-desc">
+            Seleccione un campo de la Data Extension de entrada del Journey.
+          </div>
+        </div>
       </div>
 
-      <div class="note">
-        <strong>Nota:</strong> Asegúrese de que los campos necesarios existan en la Data Extension de entrada al Journey.
+      <div class="info-box note">
+        <strong>Nota:</strong> Asegúrese de que los campos `MobilePhone` y `SMSMessage` existan en la fuente de entrada del Journey.
       </div>
     </div>
-
 
     <script>
       // Iniciar comunicación con Journey Builder
