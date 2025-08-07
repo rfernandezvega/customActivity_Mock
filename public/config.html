@@ -457,7 +457,7 @@
         const selectedTemplateId = document.getElementById('template-de-picklist').value;
         inArgs.selectedTemplateId = selectedTemplateId;
 
-        if (selectedTemplateId && deTemplates.length > 0) {
+      if (selectedTemplateId && deTemplates.length > 0) {
             const selectedTemplateObject = deTemplates.find(t => String(t.id) === selectedTemplateId);
             if (selectedTemplateObject) {
                 // Guardamos la plantilla del mensaje SIN personalizar.

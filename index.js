@@ -463,7 +463,7 @@ app.post("/execute", verifyJWT, async (req, res) => {
 
     log("Valores recuperados de la actividad:", {
           staticValues: { customText, selectedTemplate },
-          resolvedValues: { deFieldValue, phone, message, messageToSend }
+          resolvedValues: { deFieldValue, phone, message, templateMessage, messageToSend }
         });
 
     // -- Paso 1: Obtener el token de autenticación del servicio mock --
