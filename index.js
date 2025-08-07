@@ -56,6 +56,13 @@ app.use(express.text({ type: 'application/jwt' }));
 //Indica a express que sirva todos los archivos estáticos (archivos que no se procesan en el servidor, solo se envían tal como están) de la carpeta public
 app.use(express.static(path.join(__dirname, "public")));
 
+//Cuando se arrastra la actividad al Journey, MC busca la ruta /config.json, que es obligatoria.
+// Lo definimos aquí porque __dirname apunta de forma fiable a la raíz del proyecto.
+app.get("/config.json", (req, res) => {
+  log("Sirviendo config.json desde el manejador principal.");
+  res.sendFile(path.join(__dirname, "config.json"));
+});
+
 // --- Montar las Rutas ---
 // Le decimos a Express que todas las peticiones deben ser manejadas por nuestro router.
 app.use('/', activityRoutes);

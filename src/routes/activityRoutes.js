@@ -1,25 +1,33 @@
+// Trae el framework Express. Lo necesitamos para poder usar su funcionalidad de Router.
 const express = require("express");
+
+// Trae el módulo 'path' de Node.js para manejar rutas de archivos de forma segura.
 const path = require("path");
+
+// Importa nuestro propio middleware de seguridad desde su archivo.
+// El '../' significa "sube un nivel de carpeta" (de /routes a /src).
 const verifyJWT = require('../middlewares/verifyJWT');
+
+// Importa DE FORMA SELECTIVA (usando { ... }) solo la función que necesitamos del servicio de SFMC.
 const { getTemplatesFromDE } = require('../services/sfmcService');
+
+// Importa solo la función para enviar el push desde el servicio del mock.
 const { sendPush } = require('../services/mockService');
+
+// Importa nuestro "set de herramientas" para manejar los datos del Journey.
 const { 
     getInArgValue, 
     extractDataBindingValue, 
     personalizeText 
 } = require('../utils/journeyUtils');
+
+// Importa nuestra función de log estandarizada.
 const log = require('../utils/logger');
 
 const router = express.Router();
 
 // --- Rutas del Ciclo de Vida y UI ---
 
-//Cuando se arrastra la actividad al Journey, MC busca la ruta /config.json, que es obligatoria.
-router.get("/config.json", (req, res) => {
-  log("Recibida petición de solicitud de config.json");
-  // __dirname aquí apunta a /src/routes, por lo que necesitamos subir dos niveles para llegar a la raíz.
-  res.sendFile(path.join(__dirname, "../../", "config.json"));
-});
 
 // Endpoint para que el frontend obtenga los templates
 router.get("/api/templates", async (req, res) => {
