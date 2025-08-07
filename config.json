@@ -5,36 +5,39 @@
     "category": "message"
   },
   "type": "REST",
-  "key": "SMS_LleidaNet_CustomActivity",
+  "key": "Mock_CustomActivity",
   "lang": {
     "en-US": {
-      "name": "Enviar SMS Lleida.net",
-      "description": "Envía un SMS usando datos de la DE a través de Lleida.net"
+      "name": "Mock Custom Activity",
+      "description": "Realiza una llamada a un WS Mock"
     }
   },
   "arguments": {
     "execute": {
       "inArguments": [],
-      "url": "https://customactivity-sms-at.onrender.com/execute",
+      "url": "https://customactivity-mock.onrender.com/execute",
       "verb": "POST",
-      "body": "",
-      "header": "",
       "format": "json",
+      "useJwt": true,
       "timeout": 10000
     }
   },
   "configurationArguments": {
     "save": {
-      "url": "https://customactivity-sms-at.onrender.com/save"
+      "url": "https://customactivity-mock.onrender.com/save",
+      "useJwt": true
     },
     "publish": {
-      "url": "https://customactivity-sms-at.onrender.com/publish"
+      "url": "https://customactivity-mock.onrender.com/publish",
+      "useJwt": true
     },
     "validate": {
-      "url": "https://customactivity-sms-at.onrender.com/validate"
+      "url": "https://customactivity-mock.onrender.com/validate",
+      "useJwt": true
     },
     "stop": {
-      "url": "https://customactivity-sms-at.onrender.com/stop"
+      "url": "https://customactivity-mock.onrender.com/stop",
+      "useJwt": true
     }
   },
   "userInterfaces": {
@@ -42,11 +45,11 @@
       "height": 500,
       "width": 600,
       "fullscreen": false,
-      "url": "https://customactivity-sms-at.onrender.com/config.html"
+      "url": "https://customactivity-mock.onrender.com/config.html"
     }
   },
   "edit": {
-    "url": "https://customactivity-sms-at.onrender.com/config.html",
+    "url": "https://customactivity-mock.onrender.com/config.html",
     "height": 500,
     "width": 600
   }
