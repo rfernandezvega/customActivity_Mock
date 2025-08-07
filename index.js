@@ -176,7 +176,7 @@ app.get("/api/templates", async (req, res) => {
     // Procesar la respuesta para que sea fácil de usar en el frontend
     if (deResponse.data && deResponse.data.items) {
       const templates = deResponse.data.items.map(item => ({
-        id: item.values.templateid, 
+        id: item.keys.templateid, 
         name: item.values.templatename,
         message: item.values.templatemessage
       }));
