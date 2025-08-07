@@ -429,7 +429,7 @@
         }
         
         // Buscar el template seleccionado en nuestro array de templates guardados
-        const selectedTemplate = deTemplates.find(t => t.id === selectedId);
+        const selectedTemplate = deTemplates.find(t => String(t.id) === selectedId);
 
         if (selectedTemplate && selectedTemplate.message) {
           // Si encontramos el template y tiene un mensaje, lo mostramos
