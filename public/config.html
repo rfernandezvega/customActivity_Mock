@@ -452,8 +452,10 @@
         // Recoge los valores de los campos del formulario
         inArgs.customText = document.getElementById('text-input').value;
         inArgs.selectedTemplate = document.getElementById('template-picklist').value;
-        inArgs.selectedTemplateId = document.getElementById('template-de-picklist').value;
         inArgs.selectedDEField = document.getElementById('de-field-picklist').value;
+        
+        const selectedTemplateId = document.getElementById('template-de-picklist').value;
+        inArgs.selectedTemplateId = selectedTemplateId;
 
         if (selectedTemplateId && deTemplates.length > 0) {
             const selectedTemplateObject = deTemplates.find(t => String(t.id) === selectedTemplateId);

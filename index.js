@@ -416,6 +416,7 @@ function getInArgValue(inArgs, fieldName) {
  * @returns {string} - El texto con los placeholders reemplazados.
  */
 function personalizeText(text, dataContext) {
+  log("Personalizando mensaje");
   if (!text || typeof text !== 'string') {
     return text;
   }
