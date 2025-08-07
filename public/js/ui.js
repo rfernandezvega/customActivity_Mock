@@ -256,18 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
     inArgs.selectedTemplate = document.getElementById('template-picklist').value;
     inArgs.selectedDEField = document.getElementById('de-field-picklist').value;
     
-    const templateSelect = document.getElementById('template-de-picklist');
-    const selectedTemplateId = templateSelect.value;
-    inArgs.selectedTemplateId = selectedTemplateId;
-
-    // Si hay una opción seleccionada, leer el mensaje desde su atributo data-message.
-    if (selectedTemplateId) {
-        const selectedOption = templateSelect.options[templateSelect.selectedIndex];
-        if (selectedOption) {
-            inArgs.selectedTemplateMessage = selectedOption.getAttribute('data-message');
-        }
-    }
-
+   
     // --- Construcción de los Data Bindings ---
     // Extraer el eventDefinitionKey (UUID del evento) del esquema para crear bindings robustos.
     let eventDefinitionKey = "";
@@ -278,13 +267,29 @@ document.addEventListener('DOMContentLoaded', () => {
         eventDefinitionKey = parts[1];
       }
     }        
+
+    // Lógica para guardar el ID y el MENSAJE de la plantilla seleccionada 
+    const templateSelect = document.getElementById('template-de-picklist');
+    const selectedTemplateId = templateSelect.value;
+    inArgs.selectedTemplateId = selectedTemplateId;
+
+    if (selectedTemplateId) {
+        const selectedOption = templateSelect.options[templateSelect.selectedIndex];
+        if (selectedOption) 
+        {
+            // Seleccionamos el mensaje. Se podría recuperar de los valores del back que ya tenemos pero como se pinta se puede recuperar de ahí.
+            const rawMessageTemplate = selectedOption.getAttribute('data-message');
+            // Pre-personalizamos el mensaje antes de guardarlo en los inArguments.
+            inArgs.selectedTemplateMessage = personalizeMessage(rawMessageTemplate, eventDefinitionKey);
+        }
+    }
     
     if (eventDefinitionKey) {
       inArgs.phone = `{{Event.${eventDefinitionKey}.${requiredFields.phone}}}`;
       inArgs.message = `{{Event.${eventDefinitionKey}.${requiredFields.message}}}`;
       inArgs.from = `{{Event.${eventDefinitionKey}.${requiredFields.from}}}`;
     } else {
-      // Fallback si no se encuentra el eventDefinitionKey.
+      // Fallback si no se encuentra el eventDefinitionKey. Esto no es obligatorio pero permite buscar en ContactData
       inArgs.phone = `{{Contact.Attribute.DataExtension.${requiredFields.phone}}}`;
       inArgs.message = `{{Contact.Attribute.DataExtension.${requiredFields.message}}}`;
       inArgs.from = `{{Contact.Attribute.DataExtension.${requiredFields.from}}}`;
@@ -298,6 +303,60 @@ document.addEventListener('DOMContentLoaded', () => {
       payload.metaData = {};
     }
     payload.metaData.isConfigured = true;
+  }
+
+  // Función de pre-personalización 
+  /**
+   * Pre-procesa una plantilla de mensaje para convertir placeholders en data bindings.
+   * Busca %%FieldName%% y lo reemplaza con el data binding correspondiente de Journey Builder,
+   * como "{{Event.APIEvent-XYZ.FieldName}}".
+   * 
+   * @param {string} messageTemplate - El texto de la plantilla (ej: "Hola %%FirstName%%").
+   * @param {string} eventDefinitionKey - El UUID del evento de entrada del Journey.
+   * @returns {string} - El mensaje con los placeholders convertidos en data bindings.
+   */
+  function personalizeMessage(messageTemplate, eventDefinitionKey) {
+    if (!messageTemplate || !eventDefinitionKey || schemaFields.length === 0) {
+      return messageTemplate;
+    }
+
+    /* 
+        Expresión regular para encontrar todos los placeholders %%...%%
+
+        / ... /: Delimitadores de la expresión regular.
+        %%: Busca el literal "%%".
+        (.*?): 
+            . significa "cualquier carácter".
+            * significa "cero o más veces".
+            ? lo hace "non-greedy", lo que significa que se detiene en la primera coincidencia que encuentra.
+            (...) captura el contenido que coincide (el nombre del campo).
+        %%: Busca el cierre literal "%%".
+        g: Esta es el indicador global. Indica al método .replace() que siga tras la primera coincidencia para seguir reemplazando
+    */
+    const personalizedMessage = messageTemplate.replace(/%%(.*?)%%/g, (match, fieldName) => {
+      const trimmedFieldName = fieldName.trim();
+
+      // Buscar en el esquema el campo que coincide con el placeholder.
+      // Hacemos la comparación en minúsculas para que no sea sensible a mayúsculas/minúsculas.
+      const schemaField = schemaFields.find(field => field.name.toLowerCase() === trimmedFieldName.toLowerCase());
+
+      if (schemaField) {
+        /*  Si encontramos una coincidencia, construimos y devolvemos el data binding completo.
+            Usamos schemaField.key, que ya contiene la ruta completa.
+            Lo devuelve asi: 
+            {
+                name: "Campo",
+                key: "Event.APIEvent-1234-ABCD.Campo"
+            }
+        */
+        return `{{${schemaField.key}}}`;
+      } else {
+        // Si no se encuentra un campo coincidente en el esquema, se deja el placeholder original.
+        return match;
+      }
+    });
+
+    return personalizedMessage;
   }
 
 }); // Fin del listener DOMContentLoaded

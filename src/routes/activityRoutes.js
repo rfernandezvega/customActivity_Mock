@@ -17,11 +17,7 @@ const { getTemplatesFromDE } = require('../services/sfmcService');
 const { sendPush } = require('../services/mockService');
 
 // Importa nuestro "set de herramientas" para manejar los datos del Journey.
-const { 
-    getInArgValue, 
-    extractDataBindingValue, 
-    personalizeText 
-} = require('../utils/journeyUtils');
+const  getInArgValue  = require('../utils/journeyUtils');
 
 // Importa nuestra función de log estandarizada.
 const log = require('../utils/logger');
@@ -117,31 +113,23 @@ router.post("/execute", verifyJWT, async (req, res) => {
     // Extraer los argumentos de configuración guardados desde el payload del token.
     const inArgs = activityPayload.inArguments || [];
                       
-    // Obtener los valores de configuración guardados usando nuestra función de utilidad.
-    const customText = getInArgValue(inArgs, 'customText'); // Valor estático
-    const selectedTemplate = getInArgValue(inArgs, 'selectedTemplate'); // Valor estático
-    const templateMessage = getInArgValue(inArgs, 'selectedTemplateMessage'); // El mensaje SIN personalizar
-    const deFieldBinding = getInArgValue(inArgs, 'selectedDEField'); // Data Binding
-    const phoneBinding = getInArgValue(inArgs, 'phone'); // Data Binding
-    const messageBinding = getInArgValue(inArgs, 'message'); // Data Binding
-    
-    // Resolver los data bindings para obtener los valores específicos de este contacto.
-    const deFieldValue = extractDataBindingValue(deFieldBinding, activityPayload);
-    const phone = extractDataBindingValue(phoneBinding, activityPayload);
-    const message = extractDataBindingValue(messageBinding, activityPayload);
+    // Obtener los valores de configuración guardados usando función de utilidad.
+    const customText = getInArgValue(inArgs, 'customText'); 
+    const selectedTemplate = getInArgValue(inArgs, 'selectedTemplate'); 
+    const selectedTemplateId = getInArgValue(inArgs, 'selectedTemplateId'); 
+    const selectedTemplateMessage = getInArgValue(inArgs, 'selectedTemplateMessage'); 
+    const phone = getInArgValue(inArgs, 'phone'); 
+    const message = getInArgValue(inArgs, 'message'); 
+    const from = getInArgValue(inArgs, 'from');
 
-    // Personalizar el mensaje de la plantilla con los datos del contacto.
-    // Si no hay mensaje de plantilla, usa el campo 'message' de la DE de entrada como fallback.
-    let messageToSend = personalizeText(templateMessage, activityPayload) || message;
+    let messageToSend = getInArgValue(inArgs, 'selectedTemplateMessage'); 
 
-    log("Valores recuperados y personalizados de la actividad:", {
-          staticValues: { customText, selectedTemplate },
-          resolvedValues: { deFieldValue, phone, message, templateMessage, messageToSend }
-        });
+    log("Valores recibidos:", {customText, selectedTemplate, selectedTemplateId, selectedTemplateMessage, phone, message, from });
 
     // Preparar el cuerpo de la petición (payload) que se enviará al servicio externo.
     const pushPayload = {
       contactKey: activityPayload.keyValue, // El ContactKey del Journey
+      journeyId: activityPayload.journeyId, //Id del Journey
       dataFromActivity: {
         customText,
         selectedTemplate,
