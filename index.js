@@ -408,6 +408,33 @@ function getInArgValue(inArgs, fieldName) {
   return arg[fieldName];
 }
 
+// Función para personalizar mensajes 
+/**
+ * Busca y reemplaza placeholders del tipo %%FieldName%% en un texto.
+ * @param {string} text - El texto de la plantilla (ej: "Hola %%FirstName%%").
+ * @param {object} dataContext - El objeto de datos del contacto (activityPayload).
+ * @returns {string} - El texto con los placeholders reemplazados.
+ */
+function personalizeText(text, dataContext) {
+  if (!text || typeof text !== 'string') {
+    return text;
+  }
+
+  // Expresión regular para encontrar todos los placeholders del tipo %%...%%
+  return text.replace(/%%(.*?)%%/g, (match, fieldName) => {
+    // Para cada placeholder encontrado, extraemos el nombre del campo.
+    const fieldNameToFind = fieldName.trim();
+    
+    // Usamos nuestra función 'extractDataBindingValue' de una forma un poco diferente.
+    // Creamos un "binding falso" para que la función busque el valor.
+    const fakeBinding = `{{Event.DE.${fieldNameToFind}}}`; // La estructura interna no importa, solo el final.
+    const replacementValue = extractDataBindingValue(fakeBinding, dataContext);
+
+    // Si encontramos un valor, lo devolvemos. Si no, devolvemos el placeholder original.
+    return replacementValue !== null ? replacementValue : match;
+  });
+}
+
 // Endpoint principal para ejecutar la actividad. Se puede eliminar verifyJWT para pruebas. app.post("/execute", verifyJWT, async (req, res)
 app.post("/execute", verifyJWT, async (req, res) => {
   log("Procesando petición execute");
@@ -420,6 +447,7 @@ app.post("/execute", verifyJWT, async (req, res) => {
     // Obtener valores y bindings de la configuración
     const customText = getInArgValue(inArgs, 'customText'); // Valor estático
     const selectedTemplate = getInArgValue(inArgs, 'selectedTemplate'); // Valor estático
+    const templateMessage = getInArgValue(inArgs, 'selectedTemplateMessage'); // El mensaje SIN personalizar
     const deFieldBinding = getInArgValue(inArgs, 'selectedDEField'); // Data Binding
     const phoneBinding = getInArgValue(inArgs, 'phone'); // Data Binding
     const messageBinding = getInArgValue(inArgs, 'message'); // Data Binding
@@ -428,6 +456,10 @@ app.post("/execute", verifyJWT, async (req, res) => {
     const deFieldValue = extractDataBindingValue(deFieldBinding, activityPayload);
     const phone = extractDataBindingValue(phoneBinding, activityPayload);
     const message = extractDataBindingValue(messageBinding, activityPayload);
+
+    // Mensaje personalizado.
+
+    let messageToSend = personalizeText(templateMessage, activityPayload) || templateMessage;
 
     log("Valores recuperados de la actividad:", {
           staticValues: { customText, selectedTemplate },

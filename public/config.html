@@ -455,6 +455,14 @@
         inArgs.selectedTemplateId = document.getElementById('template-de-picklist').value;
         inArgs.selectedDEField = document.getElementById('de-field-picklist').value;
 
+        if (selectedTemplateId && deTemplates.length > 0) {
+            const selectedTemplateObject = deTemplates.find(t => String(t.id) === selectedTemplateId);
+            if (selectedTemplateObject) {
+                // Guardamos la plantilla del mensaje SIN personalizar.
+                inArgs.selectedTemplateMessage = selectedTemplateObject.message;
+            }
+        }
+
         // Añadir los valores "hard-coded" (phone, message, etc.) usando el esquema guardado
         // Extraer el eventDefinitionKey (UUID del evento)
         // Formato ejemplo de la Key: Event.APIEvent-1a11c19c-7952-488a-99d7-069fa2bc543c.Id
