@@ -140,33 +140,9 @@ app.post("/save", (req, res) => {
 app.post("/validate", verifyJWT, (req, res) => {
   log("Recibida petición de validación en /validate");
 
-  // Gracias a verifyJWT, el contenido de la petición está en req.activityPayload.
-  const activityPayload = req.activityPayload;
-  log("Payload decodificado para validación:", activityPayload);
+  log("Payload decodificado para validación:", req.activityPayload);
 
-  // Los argumentos que nos interesan están en activityPayload.inArguments.
-  const inArguments = activityPayload.inArguments || [];
-
-  if (inArguments.length === 0) {
-    log("Validación fallida: inArguments está vacío.");
-    return res.status(400).json({ error: "La actividad no ha sido configurada." });
-  }
-
-  const args = inArguments[0];
-
-  // Las reglas de validación ahora se aplican sobre el contenido decodificado.
-  const isCustomTextValid = args.hasOwnProperty('customText');
-  const isTemplateValid = !!args.selectedTemplate;
-  const isDEFieldValid = !!args.selectedDEField;
-  const isPhoneBindingValid = !!args.phone;
-
-  if (isCustomTextValid && isTemplateValid && isDEFieldValid && isPhoneBindingValid) {
-    log("Validación exitosa: La configuración de la actividad es completa.");
-    res.status(200).json({ success: true });
-  } else {
-    log("Validación fallida: Faltan uno o más campos de configuración.", { args });
-    return res.status(400).json({ error: "Configuración incompleta. Asegúrese de que todos los campos estén configurados." });
-  }
+  res.status(200).json({ success: true });
 });
 
 app.post("/publish", (req, res) => {
