@@ -54,8 +54,15 @@ app.use((req, res, next) => {
   next();
 });
 
-//Activa el parseador (Middleware nativo de Express que transforma el cuerpo de la petición a JSON automáticamente) 
+/*
+  Activa el parseador (Middleware nativo de Express que transforma el cuerpo de la petición a JSON automáticamente)
+  Importante. 
+  Si no se usa jwt, esto está configurado para entender peticiones con Content-Type: application/json. Cuando ve llegar 
+  una petición con Content-Type: application/jwt, no sabe cómo procesarla. Como resultado, no puebla el objeto req.body
+ */
 app.use(express.json());
+// Necesario si se usa JWT para poder parsear la petición
+app.use(express.text({ type: 'application/jwt' }));
 //Indica a express que sirva todos los archivos estáticos (archivos que no se procesan en el servidor, solo se envían tal como están) de la carpeta public
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -67,13 +74,20 @@ function verifyJWT(req, res, next)
   log("Cabeceras de la petición:", req.headers);
   log("Cuerpo completo de la petición:", req.body);
   log("--- FIN DE DATOS DE DEPURACIÓN ---");
-  
-  // En Custom Activities, MC envía el JWT en el body, no en el header.
-  if (!req.body || !req.body.token) {
-      log("Error de autenticación: No se encontró token JWT en el cuerpo de la petición.");
-      return res.status(401).json({ error: "Token JWT no encontrado en el body" });
+
+   let token;
+  // Comprobar si el body es una cadena (el caso de application/jwt)
+  if (typeof req.body === 'string' && req.body.length > 0) {
+    token = req.body;
+  } else if (req.body && req.body.token) {
+    // Fallback por si en otros endpoints (como /save) viniera como JSON
+    token = req.body.token;
   }
-  const token = req.body.token;
+
+  if (!token) {
+    log("Error de autenticación: No se encontró token en un formato válido.");
+    return res.status(401).json({ error: "Token JWT no encontrado" });
+  }
 
   const JWT_SECRET = process.env.JWT_SECRET;
   if (!JWT_SECRET) {
@@ -86,18 +100,9 @@ function verifyJWT(req, res, next)
     La función intenta verificar que el token:
       - Está bien formado (estructura JWT correcta).
       - No ha sido modificado (la firma coincide con el secreto).
-      - No está expirado (si tiene un exp).
-    La "Audience" es un claim (una pieza de información) dentro del token que especifica para quién o para qué servicio está destinado ese token.
-    ¿Quién lo establece? 
-      Cuando se configura "useJwt": true en config.json, Marketing Cloud no solo firma el token, sino que también lo emiten con una audiencia específica. 
-      Para las Custom Activities, esa audiencia es 'custom-activity'.
-    ¿Cómo funciona la verificación? 
-      Al añadir el objeto de opciones { audience: 'custom-activity' } a jwt.verify(), le estás diciendo a la librería jsonwebtoken:
-      "No solo verifiques que la firma y la fecha de expiración sean correctas. 
-      También es OBLIGATORIO que compruebes que el token tiene un claim de audiencia (aud) y que su valor sea exactamente 'custom-activity'. 
-      Si no es así, considera que la verificación ha fallado."
+      - No está expirado (si tiene un exp).  
   */
-  jwt.verify(token, JWT_SECRET, { audience: 'custom-activity' }, (err, decoded) => {
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
       log("Error de autenticación: Token inválido o expirado.", { error: err.message });
       return res.status(401).json({ error: "Token inválido o expirado" });
@@ -109,10 +114,12 @@ function verifyJWT(req, res, next)
       - iat: Fecha/hora de emisión en formato timestamp (segundos desde 1970).
       - exp: Fecha/hora de expiración en formato timestamp.
 
-      Guardar estos datos en req.user (propiedad personalizada) permite que otros middlewares o controladores accedan 
-      a la información del usuario sin tener que verificar el token nuevamente. OPCIONAL
+      Guardar estos datos en req.activityPayload (propiedad personalizada) permite que otros middlewares o controladores accedan 
+      a la información del usuario sin tener que verificar el token nuevamente.
     */
-    req.user = decoded;
+    req.activityPayload = decoded;
+
+    log("Verificación JWT exitosa. Payload decodificado del token:", req.activityPayload);
 
     next();
   });
@@ -228,9 +235,8 @@ app.post("/execute", verifyJWT, async (req, res) => {
   
   try {
     // Obtener inArguments
-    const inArgs = req.body.inArguments || 
-                  (req.body.arguments?.execute?.inArguments) || 
-                  [];
+    const activityPayload = req.activityPayload;
+    const inArgs = activityPayload.inArguments || [];
                       
     // Obtener valores y bindings de la configuración
     const customText = getInArgValue(inArgs, 'customText'); // Valor estático
@@ -240,9 +246,9 @@ app.post("/execute", verifyJWT, async (req, res) => {
     const messageBinding = getInArgValue(inArgs, 'message'); // Data Binding
     
     // Extraer valores de los data bindings
-    const deFieldValue = extractDataBindingValue(deFieldBinding, req.body);
-    const phone = extractDataBindingValue(phoneBinding, req.body);
-    const message = extractDataBindingValue(messageBinding, req.body);
+    const deFieldValue = extractDataBindingValue(deFieldBinding, activityPayload);
+    const phone = extractDataBindingValue(phoneBinding, activityPayload);
+    const message = extractDataBindingValue(messageBinding, activityPayload);
 
     log("Valores recuperados de la actividad:", {
           contactKey: req.body.keyValue,
@@ -342,5 +348,5 @@ app.post("/execute", verifyJWT, async (req, res) => {
 
 // Se encarga de que el servidor Express empiece a "escuchar" solicitudes HTTP en el puerto definido por port
 app.listen(port, () => {
-  log(`Servidor iniciado en puerto ${port} (Sin validacion JWT)`);
+  log(`Servidor iniciado en puerto ${port}`);
 });
