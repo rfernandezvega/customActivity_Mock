@@ -55,7 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
     /* 
       Este bloque es una medida de seguridad. Se asegura de que la estructura del payload
       (payload.arguments.execute.inArguments) exista, incluso si la actividad es nueva.
-      Sin esto, intentar hacer .push() sobre un array indefinido causaría un error.
     */
     if (!payload.arguments) {
       payload.arguments = {};
