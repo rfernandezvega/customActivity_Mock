@@ -133,9 +133,11 @@ router.post("/execute", verifyJWT, async (req, res) => {
       dataFromActivity: {
         customText,
         selectedTemplate,
-        deFieldValue,
+        selectedTemplateId,
+        selectedTemplateMessage,
         phone,
-        message: messageToSend // Se envía el mensaje ya personalizado.
+        message,
+        from 
       }
     };
     
