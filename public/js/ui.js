@@ -255,7 +255,9 @@ document.addEventListener('DOMContentLoaded', () => {
     inArgs.customText = document.getElementById('text-input').value;
     inArgs.selectedTemplate = document.getElementById('template-picklist').value;
     inArgs.selectedDEField = document.getElementById('de-field-picklist').value;
-    
+
+    const selectedTemplateId = document.getElementById('template-de-picklist').value;
+    inArgs.selectedTemplateId = selectedTemplateId;
    
     // --- Construcción de los Data Bindings ---
     // Extraer el eventDefinitionKey (UUID del evento) del esquema para crear bindings robustos.
@@ -266,19 +268,17 @@ document.addEventListener('DOMContentLoaded', () => {
       if (parts.length >= 2) {
         eventDefinitionKey = parts[1];
       }
-    }        
+    }    
 
-    // Lógica para guardar el ID y el MENSAJE de la plantilla seleccionada 
-    const templateSelect = document.getElementById('template-de-picklist');
-    const selectedTemplateId = templateSelect.value;
-    inArgs.selectedTemplateId = selectedTemplateId;
 
-    if (selectedTemplateId) {
-        const selectedOption = templateSelect.options[templateSelect.selectedIndex];
-        if (selectedOption) 
-        {
-            // Seleccionamos el mensaje. Se podría recuperar de los valores del back que ya tenemos pero como se pinta se puede recuperar de ahí.
-            const rawMessageTemplate = selectedOption.getAttribute('data-message');
+    // Si hay un ID seleccionado, buscar el template completo en 'deTemplates'.
+    if (selectedTemplateId && deTemplates.length > 0) {
+        // Usamos .find() en nuestro array de datos.
+        const selectedTemplateObject = deTemplates.find(t => String(t.id) === selectedTemplateId);
+        
+        if (selectedTemplateObject && selectedTemplateObject.message) {
+            // Obtenemos el mensaje crudo desde el objeto encontrado.
+            const rawMessageTemplate = selectedTemplateObject.message;
             // Pre-personalizamos el mensaje antes de guardarlo en los inArguments.
             inArgs.selectedTemplateMessage = personalizeMessage(rawMessageTemplate, eventDefinitionKey);
         }
